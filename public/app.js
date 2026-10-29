@@ -110,7 +110,7 @@
   const freshQuery = () => ({
     mode: 'HOURLY', plan: 'MONTH', date: todayStr(), start: defStart(), end: defStart() + 3,
     seat: 'ANY', people: 1, fac: [], sido: '서울특별시', sigungu: '강남구', radius: 0, geo: null,
-    nearStation: false, nearUniv: false, sort: 'price', view: 'list',
+    nearStation: false, nearUniv: false, sort: 'price', view: 'map',
   });
   const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, kakao: false };
   const cafeById = (id) => D.cafes.find((c) => c.id === Number(id));
@@ -384,7 +384,7 @@
     box.innerHTML = `${regionChips}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
       <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}</small></div>
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
-          <button class="tab" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} 지도로 보기</button></div></div>
+          <button class="tab" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} ${q.view === 'map' ? '목록만 보기' : '지도로 보기'}</button></div></div>
       <div class="reslayout${q.view === 'map' ? ' withmap' : ''}"><ul class="grid">${list.length ? list.map((it, i) => cardHtml(it, i)).join('') : empty}</ul>${q.view === 'map' ? '<div class="mapbox" id="mapbox"></div>' : ''}</div>`;
     if (q.view === 'map') drawMap($('#mapbox'), list, origin(), S.hl);
   }
