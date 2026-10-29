@@ -315,7 +315,7 @@
   }
 
   // ---- 검색 결과 ---------------------------------------------------------------------
-  function results() {
+  function results(ignoreRadius = false) {
     const q = S.q, v = qView(), org = origin();
     const list = [];
     for (const c of D.cafes) {
@@ -323,7 +323,7 @@
       if (p == null) continue;
       if (!q.geo && (c.sido !== q.sido || c.sigungu !== q.sigungu)) continue;
       const d = dist(org, [c.lat, c.lng]);
-      if (q.radius && d > q.radius) continue;
+      if (q.radius && !ignoreRadius && d > q.radius) continue;
       if (q.fac.some((f) => !c.fac.includes(f))) continue;
       if (q.nearStation && !c.station) continue;
       if (q.nearUniv && !c.univ) continue;
@@ -370,13 +370,18 @@
   function renderResults() {
     const box = $('#results');
     if (!box) return;
-    const list = results(), v = qView(), q = S.q;
+    let list = results();
+    const v = qView(), q = S.q;
+    // 내 위치 모드에서 반경 안에 카페가 없으면 가장 가까운 카페를 대신 보여준다
+    const nearestOnly = q.geo && !list.length;
+    if (nearestOnly) list = results(true).sort((a, b) => a.d - b.d).slice(0, 6);
     const where = q.geo ? '내 주변' : `${q.sido} ${q.sigungu}`;
     const when = v.mode === 'HOURLY' ? `${fmtDate(v.date)} ${hh(v.start)}–${hh(v.end)}` : `${PLAN[v.plan]}`;
     const sorts = [['price', '최저가순'], ['distance', '거리순'], ['rating', '평점순'], ['diff', '평균 대비 저렴순']];
     const empty = `<li class="empty"><h3>조건에 맞는 스터디카페가 없어요</h3><p class="muted">${q.geo ? '내 주변에 샘플 카페가 없을 수 있어요. 지역을 직접 선택해 보세요.' : '시간이나 시설 조건을 줄여서 다시 찾아보세요.'}</p><button class="btn primary" data-act="reset">조건 초기화</button></li>`;
     const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.regions.map((r) => `<button class="chip" data-act="region" data-s="${esc(r.sido)}" data-g="${esc(r.sigungu)}" aria-pressed="${!q.geo && q.sigungu === r.sigungu}">${esc(r.sigungu)}</button>`).join('')}</div>`;
-    box.innerHTML = `${regionChips}${avgStrip(list)}
+    const nearNotice = nearestOnly && list.length ? `<div class="note" style="margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span>내 위치 반경 ${q.radius || 5}km 안에는 샘플 카페가 없어요. 가장 가까운 ${list.length}곳을 보여드려요. (가장 가까운 곳: ${km(list[0].d)})</span><button class="btn sm" data-act="geo">내 위치 해제</button></div>` : ``;
+    box.innerHTML = `${regionChips}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
       <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}</small></div>
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
           <button class="tab" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} 지도로 보기</button></div></div>
