@@ -113,7 +113,7 @@
     seat: 'ANY', people: 1, fac: [], sido: '서울특별시', sigungu: '강남구', radius: 0, geo: null,
     nearStation: false, nearUniv: false, sort: 'price', view: 'map',
   });
-  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, kakao: false, mapStatus: 'loading', regionDone: new Set(), inflight: new Map(), regionLoading: null, regionError: null, limit: 12, adv: false, facMore: false };
+  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, me: null, locating: false, kakao: false, mapStatus: 'loading', regionDone: new Set(), inflight: new Map(), regionLoading: null, regionError: null, limit: 12, adv: false, facMore: false };
   // 실제 데이터로 교체되면서 빠진 샘플 카페도 찾을 수 있게 보관한다 (예약 내역 표시용)
   const archived = [];
   const cafeById = (id) => D.cafes.find((c) => c.id === Number(id)) || archived.find((c) => c.id === Number(id));
@@ -150,7 +150,8 @@
   }
   const km = (d) => (d < 1 ? `${Math.round(d * 100) * 10}m` : `${d.toFixed(1)}km`);
   const regionOf = () => D.regions.find((r) => r.sido === S.q.sido && r.sigungu === S.q.sigungu) || D.regions[0];
-  const origin = () => S.q.geo || regionOf().center;
+  // 거리 기준은 항상 내 현재 위치다. 위치를 못 받았을 때만 선택한 지역의 중심을 쓴다.
+  const origin = () => S.me || S.q.geo || regionOf().center;
   const isOpen = (c, o) => o.mode === 'PERIOD' || (c.open <= o.start && c.close >= o.end);
   const hoursText = (c) => (c.real ? '운영 시간은 카카오맵에서 확인해 주세요' : c.open === 0 && c.close === 24 ? '24시간 운영' : `${hh(c.open)} – ${hh(c.close)}`);
 
@@ -235,7 +236,7 @@
     const q = S.q, v = qView();
     const sidos = [...new Set(D.regions.map((r) => r.sido))];
     const sigs = D.regions.filter((r) => r.sido === q.sido);
-    const base = q.geo ? '현재 위치' : (/중심$/.test(regionOf().label) ? regionOf().label : `${regionOf().label} (${q.sigungu} 중심)`);
+    const base = S.me ? '현재 위치' : (/중심$/.test(regionOf().label) ? regionOf().label : `${regionOf().label} (${q.sigungu} 중심)`);
     // 시설 옵션은 앞의 4개만 보여주고 나머지는 '+ 더보기'로 펼친다 (이미 선택한 칩은 항상 보인다)
     const facAll = Object.entries(FAC);
     const facShown = S.facMore ? facAll : facAll.filter(([k], i) => i < 4 || q.fac.includes(k));
@@ -352,7 +353,8 @@
       if (p == null) continue;
       if (!q.geo && (c.sido !== q.sido || c.sigungu !== q.sigungu)) continue;
       const d = dist(org, [c.lat, c.lng]);
-      if (q.radius && !ignoreRadius && d > q.radius) continue;
+      // 반경은 '내 주변' 모드에서는 내 위치에서, 지역을 직접 고른 모드에서는 그 지역의 중심에서 잰다
+      if (q.radius && !ignoreRadius && (q.geo ? d : dist(regionOf().center, [c.lat, c.lng])) > q.radius) continue;
       if (!c.real && q.fac.some((f) => !c.fac.includes(f))) continue; // 실제 카페는 시설 정보가 없어 시설로 거르지 않는다
       if (q.nearStation && !c.station) continue;
       if (q.nearUniv && !c.univ) continue;
@@ -422,7 +424,9 @@
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
           <button class="tab map-toggle" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} ${q.view === 'map' ? '목록만 보기' : '지도로 보기'}</button></div></div>
       <div class="reslayout${q.view === 'map' ? ' withmap' : ''}"><div><ul class="grid">${list.length ? shown.map((it, i) => cardHtml(it, i)).join('') : empty}</ul>${list.length > shown.length ? `<div style="text-align:center;margin-top:18px"><button class="btn" data-act="more">더 보기 (${shown.length}/${list.length})</button></div>` : ''}</div>${q.view === 'map' ? '<div class="mapbox" id="mapbox"></div>' : ''}</div>`;
-    if (q.view === 'map') drawMap($('#mapbox'), list, origin(), S.hl); // 지도에는 조건에 맞는 카페를 모두 표시한다
+    // 지도에는 조건에 맞는 카페를 모두 표시한다. 내 위치 점은 보고 있는 지역 가까이에 있을 때만 찍는다(멀면 지도가 너무 넓어진다).
+    const mapOrg = q.geo || (S.me && dist(S.me, regionOf().center) < 15 ? S.me : null);
+    if (q.view === 'map') drawMap($('#mapbox'), list, mapOrg, S.hl);
   }
 
   function mapNotice(el, message, retry = false) {
@@ -522,7 +526,10 @@
       S.mapStatus = status;
       S.kakao = status === 'ready';
       // 지도가 준비되면 카카오 장소 검색으로 실제 스터디카페를 불러온 뒤 화면을 갱신한다
-      if (S.kakao) { S.regionLoading = regKey(regionOf()); refreshMaps(); ensureRegion(regionOf()).finally(() => onRealLoaded()); }
+      if (S.kakao) {
+        S.regionLoading = regKey(regionOf()); refreshMaps();
+        (S.q.geo ? ensureNear(S.q.geo, S.q.radius || 5) : ensureRegion(regionOf())).finally(() => onRealLoaded());
+      }
       else refreshMaps();
     };
     timer = setTimeout(() => finish('error'), 12000);
@@ -662,12 +669,30 @@
     }
     return S.inflight.get(key);
   }
-  // 내 위치 모드: 내 위치 주변(반경 안)에 걸친 시·군·구를 모두 불러온다 (너무 많으면 가까운 5곳)
+  // 현재 위치를 받아 거리 기준과 '내 주변' 모드로 설정한다. 한국 안(가장 가까운 시·군·구가 40km 이내)이 아니면 쓰지 않는다.
+  function locate(auto) {
+    if (!navigator.geolocation) { if (!auto) toast('이 브라우저에서는 위치 기능을 쓸 수 없어요.'); return Promise.resolve(false); }
+    S.locating = true;
+    return new Promise((resolve) => navigator.geolocation.getCurrentPosition((p) => {
+      S.locating = false;
+      const pt = [p.coords.latitude, p.coords.longitude];
+      const near = D.regions.map((r) => ({ r, d: dist(pt, r.center) })).sort((a, b) => a.d - b.d)[0];
+      if (!near || near.d > 40) { toast('내 위치 주변에서 지역 정보를 찾지 못해 선택한 지역 기준으로 보여드려요.'); resolve(false); return; }
+      S.me = pt; S.q.geo = pt; if (!S.q.radius) S.q.radius = 5;
+      S.q.sido = near.r.sido; S.q.sigungu = near.r.sigungu; // 지역 선택도 지금 있는 곳으로 맞춘다
+      resolve(true);
+    }, () => {
+      S.locating = false;
+      toast(auto ? '위치 권한이 없어 선택한 지역 기준으로 보여드려요. 주소창의 위치 아이콘에서 허용할 수 있어요.' : '위치를 가져올 수 없어요. 선택한 지역의 중심을 기준으로 찾을게요.');
+      resolve(false);
+    }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }));
+  }
+  // 내 위치 모드: 내 위치 주변(반경 안)에 걸친 시·군·구를 모두 불러온다 (너무 많으면 가까운 3곳)
   function ensureNear(pt, km) {
     const near = D.regions.map((r) => {
       const [x0, y0, x1, y1] = r.box, pad = km / 88;
       return { r, d: dist(pt, r.center), hit: pt[1] >= x0 - pad && pt[1] <= x1 + pad && pt[0] >= y0 - km / 111 && pt[0] <= y1 + km / 111 };
-    }).filter((x) => x.hit).sort((a, b) => a.d - b.d).slice(0, 5);
+    }).filter((x) => x.hit).sort((a, b) => a.d - b.d).slice(0, 3);
     return Promise.all(near.map((x) => ensureRegion(x.r)));
   }
 
@@ -720,7 +745,7 @@
             ${c.phone ? `<li>${ico('phone', 18)}<span>${esc(c.phone)}</span></li>` : ''}
             <li>${ico('clock', 18)}<span>${hoursText(c)}</span></li>
             <li>${ico('user', 18)}<span>${c.real ? '(예시) ' : ''}총 ${c.seats.NORMAL + c.seats.FOCUS + c.seats.ROOM}석 · 일반석 ${c.seats.NORMAL} · 집중석 ${c.seats.FOCUS} · 스터디룸 ${c.seats.ROOM}개(최대 ${c.roomCap}인)</span></li>
-            <li>${ico('target', 18)}<span>${esc(regionOf().label)}에서 ${km(dist(regionOf().center, [c.lat, c.lng]))}</span></li>
+            <li>${ico('target', 18)}<span>${S.me ? '내 위치' : esc(regionOf().label)}에서 ${km(dist(origin(), [c.lat, c.lng]))}</span></li>
           </ul><div class="mini mapbox" id="miniMap" style="position:relative;top:0;height:220px;min-height:0"></div></div></section>
         <section class="dsec" id="sec-rev"><h2>${ico('book', 20)}이용 후기</h2>${reviewBlock(c)}</section>
       </div>
@@ -996,15 +1021,12 @@
     fac: (t) => { const f = t.dataset.v, i = S.q.fac.indexOf(f); if (i < 0) S.q.fac.push(f); else S.q.fac.splice(i, 1); afterQuery(); },
     // ② 지역
     near: (t) => { S.q[t.dataset.k] = !S.q[t.dataset.k]; afterQuery(); },
+    // '내 주변' 모드를 켜고 끈다. 끄면 고른 지역만 보여주되, 거리는 계속 현재 위치에서 잰다.
     geo: () => {
       if (S.q.geo) { S.q.geo = null; afterQuery(); return; }
-      if (!navigator.geolocation) { toast('이 브라우저에서는 위치 기능을 쓸 수 없어요.'); return; }
+      if (S.me) { S.q.geo = S.me; if (!S.q.radius) S.q.radius = 5; afterQuery(); ensureNear(S.me, S.q.radius).finally(() => onRealLoaded()); return; }
       toast('위치를 확인하는 중이에요…');
-      navigator.geolocation.getCurrentPosition((p) => {
-        S.q.geo = [p.coords.latitude, p.coords.longitude]; if (!S.q.radius) S.q.radius = 5; afterQuery();
-        ensureNear(S.q.geo, S.q.radius).finally(() => onRealLoaded()); // 내 위치 주변 시·군·구를 불러온다
-      },
-        () => toast('위치를 가져올 수 없어요. 선택한 지역의 중심을 기준으로 찾을게요.'));
+      locate(false).then((ok) => { if (ok) { afterQuery(); ensureNear(S.me, S.q.radius || 5).finally(() => onRealLoaded()); } });
     },
     cat: (t) => {
       const { kind, v } = t.dataset;
@@ -1107,6 +1129,12 @@
     await seedDemo();
     renderUser();
     ensureRegion(regionOf()); // 이전에 불러온 실제 카페가 저장돼 있으면 처음부터 실제 이름으로 보여준다
+    // 웹사이트를 켤 때마다 현재 위치를 받아 내 주변 기준으로 바꾼다 (거부하면 선택한 지역 기준)
+    locate(true).then((ok) => {
+      if (!ok) return;
+      refreshPanel(); refreshCats(); renderResults();
+      ensureNear(S.me, S.q.radius || 5).finally(() => onRealLoaded());
+    });
     initKakao();
     route();
   }
