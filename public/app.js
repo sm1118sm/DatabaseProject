@@ -694,6 +694,26 @@
       resolve(false);
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }));
   }
+  // 현재 위치를 받아 지역 선택(시/도·구/군)과 결과를 그 위치로 바꾼다. 성공하면 true.
+  function applyLocation(announce) {
+    if (S.locating) return Promise.resolve(false);
+    return locate().then((ok) => {
+      if (!ok) { renderResults(); return false; }
+      refreshPanel(); refreshCats(); renderResults();
+      ensureNear(S.me, S.q.radius || 5).finally(() => onRealLoaded());
+      if (announce) toast(`현재 위치를 반영했어요: ${S.q.sido} ${S.q.sigungu}`);
+      return true;
+    });
+  }
+  // 위치 권한이 나중에 '허용'으로 바뀌면(주소창에서 바꾸거나 설정을 다녀온 뒤) 버튼을 누르지 않아도 자동으로 반영한다
+  function watchLocationPermission() {
+    const retry = () => { if (!S.me && !S.locating) applyLocation(true); };
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((st) => { st.onchange = () => { if (st.state === 'granted') retry(); }; }).catch(() => { /* 지원하지 않는 브라우저 */ });
+    }
+    // 권한 변경 신호를 못 받는 브라우저를 위해, 사이트로 돌아왔을 때도 한 번 확인한다
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && !S.me && S.locFail === 'denied' && navigator.permissions) navigator.permissions.query({ name: 'geolocation' }).then((st) => { if (st.state === 'granted') retry(); }).catch(() => {}); });
+  }
   // 내 위치 모드: 내 위치 주변(반경 안)에 걸친 시·군·구를 모두 불러온다 (너무 많으면 가까운 3곳)
   function ensureNear(pt, km) {
     const near = D.regions.map((r) => {
@@ -1022,7 +1042,7 @@
     adv: () => { S.adv = !S.adv; refreshPanel(); },
     facmore: () => { S.facMore = !S.facMore; refreshPanel(); },
     goArea: () => { const el = $('#sec-area'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); const sel = $('#qSido'); if (sel) setTimeout(() => sel.focus(), 400); } },
-    locRetry: () => { S.locFail = null; toast('위치를 확인하는 중이에요…'); locate().then((ok) => { if (ok) { refreshPanel(); refreshCats(); renderResults(); ensureNear(S.me, S.q.radius || 5).finally(() => onRealLoaded()); } else renderResults(); }); },
+    locRetry: () => { S.locFail = null; toast('위치를 확인하는 중이에요…'); applyLocation(); },
     locHelp: () => openModal(`<h2>내 위치 허용하기</h2><p class="muted" style="margin:0 0 14px">한 번 거부하면 사이트가 다시 물어볼 수 없어서, 브라우저에서 직접 바꿔야 해요.</p>
       <ol style="margin:0;padding-left:20px;display:grid;gap:10px;font-size:14px">
         <li><b>Chrome·Edge</b>: 주소창 왼쪽의 자물쇠(또는 설정) 아이콘 → <b>사이트 설정</b> → 위치를 <b>허용</b>으로 바꿔요.</li>
@@ -1042,7 +1062,7 @@
       if (S.q.geo) { S.q.geo = null; afterQuery(); return; }
       if (S.me) { S.q.geo = S.me; if (!S.q.radius) S.q.radius = 5; afterQuery(); ensureNear(S.me, S.q.radius).finally(() => onRealLoaded()); return; }
       toast('위치를 확인하는 중이에요…');
-      locate().then((ok) => { if (ok) { afterQuery(); ensureNear(S.me, S.q.radius || 5).finally(() => onRealLoaded()); } else renderResults(); });
+      applyLocation();
     },
     cat: (t) => {
       const { kind, v } = t.dataset;
@@ -1147,11 +1167,8 @@
     restoreRegion();
     ensureRegion(regionOf()); // 이전에 불러온 실제 카페가 저장돼 있으면 처음부터 실제 이름으로 보여준다
     // 웹사이트를 켤 때마다 현재 위치를 받아 내 주변 기준으로 바꾼다 (거부하면 선택한 지역 기준)
-    locate().then((ok) => {
-      if (!ok) { renderResults(); return; } // 못 받았으면 이유를 알려주는 안내 줄을 보여준다
-      refreshPanel(); refreshCats(); renderResults();
-      ensureNear(S.me, S.q.radius || 5).finally(() => onRealLoaded());
-    });
+    applyLocation();
+    watchLocationPermission();
     initKakao();
     route();
   }
