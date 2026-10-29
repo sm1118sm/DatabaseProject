@@ -163,14 +163,16 @@ select:focus, input:focus, textarea:focus { border-color: var(--gold); }
   #f1e8d4; }
 .fakemap::after { content: ""; position: absolute; left: -10%; right: -10%; top: 62%; height: 42px; background: rgba(120, 160, 190, .28); transform: rotate(-8deg); }
 .pin { position: absolute; transform: translate(-50%, -100%); border: none; background: none; padding: 0; display: flex; flex-direction: column; align-items: center; z-index: 2; }
-.pin .bubble { background: var(--espresso); color: var(--cream); font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 8px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0, 0, 0, .25); }
-.pin .bubble.low { background: var(--cheap); }
-.pin .bubble.high { background: var(--pricey); }
+.pin .bubble, .kpin .bubble { background: var(--espresso); color: var(--cream); font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 8px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0, 0, 0, .25); }
+.pin .bubble.low, .kpin .bubble.low { background: var(--cheap); }
+.pin .bubble.high, .kpin .bubble.high { background: var(--pricey); }
 .pin::after { content: ""; width: 0; height: 0; border: 6px solid transparent; border-top-color: var(--espresso); margin-top: -1px; }
 .pin.on { z-index: 3; }
 .pin.on .bubble { outline: 3px solid var(--gold); }
 .kpin { border: none; background: none; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; }
 .kpin::after { content: ""; border: 6px solid transparent; border-top-color: var(--espresso); margin-top: -1px; }
+.kpin:has(.bubble.low)::after { border-top-color: var(--cheap); }
+.kpin:has(.bubble.high)::after { border-top-color: var(--pricey); }
 .origin { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: #2f6bff; border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(47, 107, 255, .2); z-index: 1; }
 .maplabel { position: absolute; left: 10px; bottom: 10px; font-size: 12px; background: rgba(255, 255, 255, .9); padding: 4px 9px; border-radius: 8px; z-index: 4; color: var(--muted); }
 .mapbox .kmap { position: absolute; inset: 0; }
