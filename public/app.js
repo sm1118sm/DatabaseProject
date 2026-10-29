@@ -414,7 +414,7 @@
     if (hlIdx >= S.limit) S.limit = hlIdx + 1; // 지도에서 고른 카페가 목록에 보이도록 목록을 그 위치까지 펼친다
     const shown = list.slice(0, S.limit);
     const realNote = S.regionLoading ? `<p class="note" style="margin-bottom:12px">카카오맵에서 ${esc(q.sigungu)} 스터디카페를 불러오는 중이에요…</p>`
-      : realMode() ? '<p class="note" style="margin-bottom:12px">카페 이름·주소·위치는 카카오맵 정보이고, <b>요금과 좌석 수는 예시</b>예요. 카페를 누르면 카카오맵 링크가 있어요.</p>' : '';
+      : '';
     const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.quick.map(([sd, sg]) => `<button class="chip" data-act="region" data-s="${esc(sd)}" data-g="${esc(sg)}" aria-pressed="${!q.geo && q.sido === sd && q.sigungu === sg}">${esc(sg)}</button>`).join('')}</div>`;
     const nearNotice = nearestOnly && list.length ? `<div class="note" style="margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span>내 위치 반경 ${q.radius || 5}km 안에는 샘플 카페가 없어요. 가장 가까운 ${list.length}곳을 보여드려요. (가장 가까운 곳: ${km(list[0].d)})</span><button class="btn sm" data-act="geo">내 위치 해제</button></div>` : ``;
     box.innerHTML = `${realNote}${regionChips}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
