@@ -1,0 +1,17 @@
+{
+  "name": "studycafe",
+  "version": "1.0.0",
+  "description": "스터디카페 통합 예약 및 비교 플랫폼 (데이터베이스설계 과제)",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "db:init": "node scripts/init-db.js",
+    "collect": "node scripts/collect-kakao.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mysql2": "^3.11.0"
+  }
+}
