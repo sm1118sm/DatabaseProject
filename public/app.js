@@ -113,7 +113,7 @@
     seat: 'ANY', people: 1, fac: [], sido: '서울특별시', sigungu: '강남구', radius: 0, geo: null,
     nearStation: false, nearUniv: false, sort: 'price', view: 'map',
   });
-  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, kakao: false, mapStatus: 'loading', realStatus: 'none', limit: 12 };
+  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, kakao: false, mapStatus: 'loading', realStatus: 'none', limit: 12, adv: false };
   // 실제 데이터로 교체되면서 빠진 샘플 카페도 찾을 수 있게 보관한다 (예약 내역 표시용)
   const archived = [];
   const cafeById = (id) => D.cafes.find((c) => c.id === Number(id)) || archived.find((c) => c.id === Number(id));
@@ -236,41 +236,52 @@
     const sidos = [...new Set(D.regions.map((r) => r.sido))];
     const sigs = D.regions.filter((r) => r.sido === q.sido);
     const base = q.geo ? '현재 위치' : `${regionOf().label} (${q.sigungu} 중심)`;
+    const advCount = (q.seat !== 'ANY' ? 1 : 0) + (q.people > 1 ? 1 : 0) + q.fac.length + (q.radius ? 1 : 0) + (q.geo ? 1 : 0) + (q.nearStation ? 1 : 0) + (q.nearUniv ? 1 : 0);
     return `<div class="panel-grid">
       <div class="pgroup" id="sec-opt">
-        <h3><span class="step">1</span>이용 옵션 선택</h3>
+        <h3><span class="step">1</span>이용 옵션</h3>
         <div class="field"><span class="lbl">이용 형태</span><div class="seg" role="group" aria-label="이용 형태">
           <button data-act="mode" data-v="HOURLY" aria-pressed="${q.mode === 'HOURLY'}">시간제</button>
           <button data-act="mode" data-v="PERIOD" aria-pressed="${q.mode === 'PERIOD'}">기간제</button></div></div>
         <div id="optTime">${optTimeHtml()}</div>
         ${v.type === 'ROOM' && q.mode === 'PERIOD' ? '<p class="note" style="margin-bottom:12px">스터디룸은 시간제로만 이용할 수 있어요.</p>' : ''}
-        <div class="field"><span class="lbl">좌석 유형</span><div class="chips">
-          ${[['ANY', '전체'], ['NORMAL', '일반석'], ['FOCUS', '집중석'], ['ROOM', '스터디룸']].map(([k, t]) => `<button class="chip" data-act="seat" data-v="${k}" aria-pressed="${(q.people > 1 ? 'ROOM' : q.seat) === k}">${t}</button>`).join('')}</div></div>
-        <div class="field"><span class="lbl">인원 수</span><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <div class="stepper"><button data-act="people" data-v="-1" aria-label="인원 줄이기">−</button><span>${q.people}명</span><button data-act="people" data-v="1" aria-label="인원 늘리기">+</button></div>
-          ${q.people > 1 ? '<p class="note">2인 이상은 스터디룸만 예약할 수 있어요.</p>' : ''}</div></div>
-        <div class="field" style="margin-bottom:0"><span class="lbl">시설 옵션</span><div class="chips">
-          ${Object.entries(FAC).map(([k, t]) => `<button class="chip" data-act="fac" data-v="${k}" aria-pressed="${q.fac.includes(k)}" ${realMode() ? FAC_OFF : ''}>${ico(FACICO[k], 15)}${t}</button>`).join('')}</div>
-          ${realMode() ? '<p class="note" style="margin-top:8px">카카오맵 데이터에는 시설·좌석 유형·운영 시간 정보가 없어서, 이 항목들은 목록을 걸러내지 못해요. 요금 표시만 바뀌어요.</p>' : ''}</div>
       </div>
       <div class="pgroup" id="sec-area">
-        <h3><span class="step">2</span>지역 설정</h3>
+        <h3><span class="step">2</span>지역</h3>
         <div class="row2">
           <div class="field"><label for="qSido">시/도</label><select id="qSido" data-q="sido">${sidos.map((s) => `<option${s === q.sido ? ' selected' : ''}>${esc(s)}</option>`).join('')}</select></div>
           <div class="field"><label for="qSig">구/군</label><select id="qSig" data-q="sigungu">${sigs.map((r) => `<option${r.sigungu === q.sigungu ? ' selected' : ''}>${esc(r.sigungu)}</option>`).join('')}</select></div>
         </div>
-        <div class="field"><span class="lbl">거리 기준</span><div class="row2">
-          <select id="qRadius" data-q="radius" aria-label="반경">${[[0, '반경 제한 없음'], [1, '반경 1km'], [3, '반경 3km'], [5, '반경 5km']].map(([k, t]) => `<option value="${k}"${q.radius === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
-          <button class="btn" data-act="geo" aria-pressed="${!!q.geo}">${ico('target', 16)}${q.geo ? '내 위치 해제' : '내 위치로 검색'}</button></div></div>
-        <div class="field"><span class="lbl">추가 지역 조건</span><div class="chips">
-          <button class="chip" data-act="near" data-k="nearStation" aria-pressed="${q.nearStation}">${ico('train', 15)}역 근처</button>
-          <button class="chip" data-act="near" data-k="nearUniv" aria-pressed="${q.nearUniv}">${ico('school', 15)}대학교 근처</button></div></div>
-        <p class="note" style="margin:0">거리 기준 위치: ${esc(base)}${q.geo ? '' : ' · 내 위치 검색은 선택 사항이에요'}</p>
+        <p class="note" style="margin:0">거리 기준 위치: ${esc(base)}${q.geo ? '' : ' · 내 위치 검색은 상세 조건에 있어요'}</p>
+      </div>
+    </div>
+    <div class="adv" id="sec-adv"${S.adv ? '' : ' hidden'}>
+      <div class="panel-grid">
+        <div class="pgroup">
+          <h3>좌석·시설</h3>
+          <div class="field"><span class="lbl">좌석 유형</span><div class="chips">
+            ${[['ANY', '전체'], ['NORMAL', '일반석'], ['FOCUS', '집중석'], ['ROOM', '스터디룸']].map(([k, t]) => `<button class="chip" data-act="seat" data-v="${k}" aria-pressed="${(q.people > 1 ? 'ROOM' : q.seat) === k}">${t}</button>`).join('')}</div></div>
+          <div class="field"><span class="lbl">인원 수</span><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <div class="stepper"><button data-act="people" data-v="-1" aria-label="인원 줄이기">−</button><span>${q.people}명</span><button data-act="people" data-v="1" aria-label="인원 늘리기">+</button></div>
+            ${q.people > 1 ? '<p class="note">2인 이상은 스터디룸만 예약할 수 있어요.</p>' : ''}</div></div>
+          <div class="field" style="margin-bottom:0"><span class="lbl">시설 옵션</span><div class="chips">
+            ${Object.entries(FAC).map(([k, t]) => `<button class="chip" data-act="fac" data-v="${k}" aria-pressed="${q.fac.includes(k)}" ${realMode() ? FAC_OFF : ''}>${ico(FACICO[k], 15)}${t}</button>`).join('')}</div>
+            ${realMode() ? '<p class="note" style="margin-top:8px">카카오맵 데이터에는 시설·좌석 유형·운영 시간 정보가 없어서, 이 항목들은 목록을 걸러내지 못해요. 요금 표시만 바뀌어요.</p>' : ''}</div>
+        </div>
+        <div class="pgroup">
+          <h3>거리·주변</h3>
+          <div class="field"><span class="lbl">거리 기준</span><div class="row2">
+            <select id="qRadius" data-q="radius" aria-label="반경">${[[0, '반경 제한 없음'], [1, '반경 1km'], [3, '반경 3km'], [5, '반경 5km']].map(([k, t]) => `<option value="${k}"${q.radius === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
+            <button class="btn" data-act="geo" aria-pressed="${!!q.geo}">${ico('target', 16)}${q.geo ? '내 위치 해제' : '내 위치로 검색'}</button></div></div>
+          <div class="field" style="margin-bottom:0"><span class="lbl">추가 지역 조건</span><div class="chips">
+            <button class="chip" data-act="near" data-k="nearStation" aria-pressed="${q.nearStation}">${ico('train', 15)}역 근처</button>
+            <button class="chip" data-act="near" data-k="nearUniv" aria-pressed="${q.nearUniv}">${ico('school', 15)}대학교 근처</button></div></div>
+        </div>
       </div>
     </div>
     <div class="panel-foot">
-      <span class="muted">${v.type === 'ROOM' ? '스터디룸' : SEAT[v.type]} · ${v.mode === 'HOURLY' ? `${fmtDate(q.date)} ${hh(q.start)}–${hh(q.end)}` : `${PLAN[q.plan]} (${fmtDate(q.date)} 시작)`}${q.people > 1 ? ` · ${q.people}명` : ''}</span>
-      <span class="panel-actions"><button class="btn" data-act="reset">조건 초기화</button><button class="btn primary lg" data-act="search">${ico('search', 18)}조건에 맞는 스터디카페 보기</button></span>
+      <button class="btn" data-act="adv" aria-expanded="${S.adv}">${S.adv ? '상세 조건 닫기' : '상세 조건'}${advCount ? ` (${advCount})` : ''}</button>
+      <span class="panel-actions"><button class="btn" data-act="reset">조건 초기화</button><button class="btn primary lg" data-act="search">${ico('search', 18)}스터디카페 보기</button></span>
     </div>`;
   }
   const refreshPanel = () => { const p = $('#panel'); if (p) p.innerHTML = panelHtml(); };
@@ -287,8 +298,7 @@
     <section class="hero"><div class="wrap">
       <span class="eyebrow">${ico('book', 15)}스터디카페 통합 예약·비교</span>
       <h1>우리 동네 스터디카페,<br><em>평균보다 얼마나 저렴할까?</em></h1>
-      <p>이용 옵션과 지역만 고르면 조건에 맞는 스터디카페를 최저가 순으로 비교하고, 빈 좌석을 확인해 바로 예약할 수 있어요.</p>
-      <div class="hero-stats">${heroStats()}</div>
+      <p>시간과 지역만 고르면 조건에 맞는 스터디카페를 최저가 순으로 보여드려요.</p>
     </div></section>
     <div class="wrap"><div class="panel" id="panel">${panelHtml()}</div></div>
 
@@ -377,7 +387,6 @@
         <div class="cloc"><span>${ico('pin', 14)}${esc(c.sigungu)} · ${km(d)}</span>${where}</div>
         <div class="crate">${r.n ? `<span class="star">★</span> ${r.avg.toFixed(1)} <span class="muted">(${r.n})</span>` : '<span class="muted">후기 없음</span>'}</div>
         <div class="cfac">${c.fac.filter((f) => f !== 'h').slice(0, 4).map((f) => `<span>${FAC[f]}</span>`).join('')}</div>
-        <div class="avgbar"><div class="track"><span class="mid"></span><span class="dot ${cls}" style="left:${pct}%"></span></div>${esc(c.sigungu)} 평균 ${won(avg)}</div>
         <div class="cprice"><span class="p">${v.mode === 'HOURLY' ? '시간당' : PLAN[v.plan]}${c.real ? ' (예시)' : ''} <b>${won(p)}</b></span>${seats}</div>
       </div></li>`;
   }
@@ -664,7 +673,7 @@
       const p = price(c, type, mode, plan);
       if (p == null) return '<td class="muted">–</td>';
       const [cls, t] = diffTag(p - regionAvg(c, type, mode, plan));
-      return `<td>${won(p)}<small class="diff ${cls === 'even' ? '' : cls}">${t}</small></td>`;
+      return `<td><span class="pv">${won(p)}</span><small class="diff">${t}</small></td>`;
     };
     return `<div class="tablewrap"><table class="price"><thead><tr><th>구분</th><th>시간제 (1시간)</th><th>1일권</th><th>주간권 (7일)</th><th>월간권 (30일)</th></tr></thead><tbody>
       ${['NORMAL', 'FOCUS', 'ROOM'].map((t) => `<tr><td>${SEAT[t]}${t === 'ROOM' ? `<small class="muted">최대 ${c.roomCap}인</small>` : ''}</td>${cell(t, 'HOURLY')}${cell(t, 'PERIOD', 'DAY')}${cell(t, 'PERIOD', 'WEEK')}${cell(t, 'PERIOD', 'MONTH')}</tr>`).join('')}
@@ -707,11 +716,12 @@
           <div class="field"><label for="bEnd">종료</label><select id="bEnd" data-b="end">${timeOptions(b.end, b.start + 1, c.close)}</select></div></div>`
     : `<div class="field"><label for="bDate">시작일</label><input id="bDate" type="date" data-b="date" min="${todayStr()}" value="${esc(b.date)}"></div>
           <div class="field"><span class="lbl">이용 기간</span><div class="chips">${Object.entries(PLAN).map(([k, t]) => `<button class="chip" data-act="bplan" data-v="${k}" aria-pressed="${b.plan === k}">${t}</button>`).join('')}</div></div>`}
-      <div class="sumrows">
-        <div><span class="muted">좌석</span><span>${b.seat ? seatLabel(b.seat, b.type) : '아직 선택 안 함'}</span></div>
+      ${b.seat ? `<div class="sumrows">
+        <div><span class="muted">좌석</span><span>${seatLabel(b.seat, b.type)}</span></div>
         <div><span class="muted">${b.mode === 'HOURLY' ? '시간당 요금' : `${PLAN[b.plan]} 요금`}</span><span>${won(unit)}</span></div>
         ${b.mode === 'HOURLY' ? `<div><span class="muted">이용 시간</span><span>${Math.max(0, b.end - b.start)}시간</span></div>` : `<div><span class="muted">이용 기간</span><span>${fmtDate(b.date)} ~ ${fmtDate(addDays(b.date, DAYS[b.plan] - 1))}</span></div>`}
-        <div class="total"><span>결제 금액</span><span>${err ? '-' : won(total)}</span></div></div>
+        ${err ? '' : `<div class="total"><span>결제 금액</span><span>${won(total)}</span></div>`}</div>`
+      : '<p class="seathint">아래 좌석 현황에서 원하는 좌석을 선택하면 요금이 표시돼요. 선택한 좌석을 다시 누르면 해제돼요.</p>'}
       ${err ? `<p class="err">${esc(err)}</p>` : ''}
       <button class="btn primary lg block" style="margin-top:14px" data-act="pay" ${err || !b.seat ? 'disabled' : ''}>${label}</button>
       <p class="refund">이용 1시간 전까지 취소하면 100% 환불, 이후에는 50% 환불돼요. (기간제는 시작 전 100%)</p>`;
@@ -900,13 +910,21 @@
     home: (t, e) => { e.preventDefault(); location.hash = 'home'; if (!$('#panel')) return; window.scrollTo(0, 0); },
     goto: (t) => { const h = t.dataset.hash; if (location.hash === '#' + h) route(); else location.hash = h; },
     nav: (t) => {
-      const go = () => { const el = document.getElementById(t.dataset.to); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+      const go = () => { // 부드럽게 이동한 뒤 도착한 영역을 잠깐 강조한다
+        const el = document.getElementById(t.dataset.to);
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const mark = el.querySelector('h2, h3') || el;
+        mark.classList.remove('sec-flash'); void mark.offsetWidth; mark.classList.add('sec-flash');
+        setTimeout(() => mark.classList.remove('sec-flash'), 1600);
+      };
       if (!document.getElementById(t.dataset.to)) { location.hash = 'home'; setTimeout(go, 60); } else go();
     },
     soon: () => toast('준비 중인 페이지예요.'),
     closeModal,
     open: (t) => { location.hash = 'cafe-' + t.dataset.id; },
     // ① 이용 옵션
+    adv: () => { S.adv = !S.adv; refreshPanel(); },
     mode: (t) => { S.q.mode = t.dataset.v; afterQuery(); },
     plan: (t) => { S.q.plan = t.dataset.v; afterQuery(); },
     seat: (t) => { S.q.seat = t.dataset.v; if (S.q.seat !== 'ROOM' && S.q.people > 1) S.q.people = 1; if (S.q.seat === 'ROOM' && S.q.people < 2) S.q.people = 1; afterQuery(); },
@@ -944,7 +962,7 @@
     bmode: (t) => { S.book.mode = t.dataset.v; refreshBook(); },
     btype: (t) => { S.book.type = t.dataset.v; if (S.book.type === 'ROOM') S.book.mode = 'HOURLY'; S.book.seat = null; refreshBook(); },
     bplan: (t) => { S.book.plan = t.dataset.v; refreshBook(); },
-    bseat: (t) => { S.book.seat = t.dataset.k; refreshBook(); },
+    bseat: (t) => { S.book.seat = S.book.seat === t.dataset.k ? null : t.dataset.k; refreshBook(); }, // 선택한 좌석을 다시 누르면 해제
     pay: openPay, payGo,
     toRes: () => { closeModal(); location.hash = 'reservations'; },
     login: () => openAuth('login', S.pending), signup: () => openAuth('signup', S.pending),
@@ -1003,6 +1021,7 @@
   // ---- 라우팅: #home / #cafe-번호 / #reservations ------------------------------------------
   function route() {
     const h = location.hash.replace('#', '');
+    view.classList.remove('enter'); void view.offsetWidth; view.classList.add('enter'); // 화면이 바뀔 때 부드럽게 나타난다
     if (h.startsWith('cafe-')) showCafe(Number(h.slice(5)));
     else if (h === 'reservations') showReservations();
     else { showHome(); window.scrollTo(0, 0); }
