@@ -390,10 +390,17 @@
   }
 
   // ---- 지도: 카카오 키가 있으면 실제 지도, 없으면 간이 지도 ------------------------------------
-  function drawMap(el, items, org, hlId) {
+  function drawMap(el, items, org, hlId, asImage = false) {
     if (!el) return;
     if (S.kakao && window.kakao && kakao.maps && (items.length || org)) {
       el.innerHTML = '<div class="kmap"></div>';
+      if (asImage && items.length === 1 && kakao.maps.StaticMap) { // 움직이지 않는 이미지 지도
+        const { c, p, diff } = items[0];
+        new kakao.maps.StaticMap($('.kmap', el), { center: new kakao.maps.LatLng(c.lat, c.lng), level: 3 });
+        el.insertAdjacentHTML('beforeend', `<span class="pin on" style="left:50%;top:50%;z-index:4"><span class="bubble ${diff < 0 ? 'low' : diff > 0 ? 'high' : ''}">${p.toLocaleString('ko-KR')}</span></span>
+          <a class="maplink" href="https://map.kakao.com/link/map/${encodeURIComponent(c.name)},${c.lat},${c.lng}" target="_blank" rel="noopener">카카오맵에서 크게 보기 ↗</a>`);
+        return;
+      }
       const ctr = org || [items[0].c.lat, items[0].c.lng];
       const map = new kakao.maps.Map($('.kmap', el), { center: new kakao.maps.LatLng(ctr[0], ctr[1]), level: 5 });
       const bounds = new kakao.maps.LatLngBounds();
@@ -433,7 +440,7 @@
       s.onload = () => kakao.maps.load(() => {
         S.kakao = true; renderResults();
         const mini = $('#miniMap');
-        if (mini && S.book) { const c = cafeById(S.book.cafeId); drawMap(mini, [{ c, p: price(c, 'NORMAL', 'HOURLY'), diff: 0 }], null, c.id); }
+        if (mini && S.book) { const c = cafeById(S.book.cafeId); drawMap(mini, [{ c, p: price(c, 'NORMAL', 'HOURLY'), diff: 0 }], null, c.id, true); }
       });
       document.head.appendChild(s);
     };
@@ -494,7 +501,7 @@
         <section class="dsec" id="sec-rev"><h2>${ico('book', 20)}이용 후기</h2>${reviewBlock(c)}</section>
       </div>
       <aside><div class="bookcard" id="bookbox"></div></aside></div></div>`;
-    drawMap($('#miniMap'), [{ c, p: price(c, 'NORMAL', 'HOURLY'), diff: 0 }], null, c.id);
+    drawMap($('#miniMap'), [{ c, p: price(c, 'NORMAL', 'HOURLY'), diff: 0 }], null, c.id, true);
     refreshBook();
     window.scrollTo(0, 0);
     void q;
