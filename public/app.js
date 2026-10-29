@@ -75,35 +75,11 @@
   const FACICO = { s: 'snack', p: 'printer', l: 'locker', h: 'moon', e: 'plug', w: 'shower', g: 'sofa' };
   const PHOTO_LABEL = ['열람실', '집중석 부스', '스낵바', '스터디룸', '휴게 라운지'];
 
-  const PAL = [['#efe0c2', '#c79a4a', '#5b4129'], ['#dfe8dc', '#7aa088', '#35523f'], ['#ecdcd3', '#c4806a', '#6a3a2c'], ['#dde5ee', '#7f9ab8', '#32465e'], ['#f1e6cc', '#b99b5c', '#4a3a1e']];
-  function photo(c, i) { // 사진 대신 쓰는 샘플 일러스트
-    const [bg, mid, dark] = PAL[(c.id + i) % PAL.length];
-    const k = i % 5;
-    const r = (x, y, w, h, f, rx = 4, o = 1) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${f}" opacity="${o}"/>`;
-    const o = (x, y, rad, f, op = 1) => `<circle cx="${x}" cy="${y}" r="${rad}" fill="${f}" opacity="${op}"/>`;
-    let s = r(0, 0, 400, 150, bg, 0) + r(0, 150, 400, 110, mid, 0, .35) + r(268, 22, 100, 78, '#fff', 8, .6) + r(315, 22, 5, 78, mid, 0, .6);
-    if (k === 0) {
-      for (let row = 0; row < 3; row++) for (let col = 0; col < 4; col++) {
-        const x = 36 + col * 86, y = 128 + row * 44;
-        s += r(x, y, 70, 24, mid, 5) + r(x + 8, y - 12, 22, 14, dark, 3, .85) + o(x + 52, y + 12, 5, dark, .7);
-      }
-    } else if (k === 1) {
-      for (let col = 0; col < 5; col++) {
-        const x = 24 + col * 72;
-        s += r(x, 96, 62, 130, mid, 6) + r(x + 8, 150, 46, 18, dark, 4, .7) + r(x + 20, 128, 22, 16, dark, 3, .85);
-      }
-    } else if (k === 2) {
-      s += r(24, 150, 352, 70, dark, 8, .9) + r(40, 60, 150, 8, dark, 3, .5) + r(40, 92, 150, 8, dark, 3, .5);
-      for (let n = 0; n < 5; n++) s += o(60 + n * 56, 138, 9, '#fff', .9) + r(51 + n * 56, 138, 18, 14, mid, 3);
-    } else if (k === 3) {
-      s += r(110, 150, 180, 56, dark, 28, .9);
-      for (let n = 0; n < 3; n++) s += o(140 + n * 60, 134, 14, mid) + o(140 + n * 60, 224, 14, mid);
-      s += r(30, 40, 90, 54, '#fff', 4, .85) + r(38, 52, 74, 4, dark, 2, .5) + r(38, 64, 56, 4, dark, 2, .5);
-    } else {
-      s += r(40, 150, 150, 52, dark, 14, .85) + r(30, 140, 26, 70, dark, 10, .85) + r(176, 140, 26, 70, dark, 10, .85);
-      s += o(300, 128, 26, mid) + r(296, 150, 8, 60, dark, 3, .8) + r(340, 90, 4, 120, dark, 2, .6) + o(342, 86, 12, '#e7b95a', .9);
-    }
-    return `<svg class="photo" viewBox="0 0 400 260" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${esc(PHOTO_LABEL[k])} 일러스트">${s}</svg>`;
+  // 카카오는 사진을 주지 않아서, 사진 자리에는 카페마다 색만 다른 깔끔한 자리표시를 둔다
+  const TINTS = [['#eaf3ff', '#bcd6fb'], ['#e9f7ef', '#bfe3cf'], ['#fff1e5', '#f6d3b3'], ['#f1eefb', '#d4cbef']];
+  function photo(c, i) {
+    const [bg, fg] = TINTS[(c.id + i) % TINTS.length];
+    return `<svg class="photo" viewBox="0 0 400 260" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${esc(c.name)} 사진 준비 중"><rect width="400" height="260" fill="${bg}"/><g transform="translate(176 83) scale(2)" fill="none" stroke="${fg}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="${P.book}"/></g></svg>`;
   }
 
   // ---- 상태 ---------------------------------------------------------------------
@@ -359,8 +335,7 @@
     const items = [['시간제', mean('HOURLY')]];
     if (v.type !== 'ROOM') Object.entries(PLAN).forEach(([k, t]) => items.push([t, mean('PERIOD', k)]));
     const title = q.geo ? `내 주변 ${q.radius || 5}km 이내` : q.sigungu;
-    return `<div class="avgstrip"><span class="t">${ico('chart', 18)}${esc(title)} ${SEAT[v.type]} 평균 가격</span>
-      ${items.filter(([, x]) => x != null).map(([t, x]) => `<span class="v">${t}<b>${won(x)}</b></span>`).join('')}</div>`;
+    return `<p class="avgline">${esc(title)} ${SEAT[v.type]} 평균 · ${items.filter(([, x]) => x != null).map(([t, x]) => `${t} <b>${won(x)}</b>`).join(' · ')}</p>`;
   }
 
   function cardHtml(it, idx) {
@@ -405,7 +380,7 @@
     const locNote = !S.me && why ? `<div class="locnote"><span>${why} <b>${esc(q.sido)} ${esc(q.sigungu)}</b> 기준으로 보여드려요.</span><span class="locbtns">${['denied', 'unavailable'].includes(S.locFail) ? '<button class="btn sm" data-act="locHelp">위치 허용 방법</button>' : ''}${S.locFail !== 'unsupported' ? '<button class="btn sm" data-act="locRetry">다시 시도</button>' : ''}<button class="btn sm" data-act="goArea">지역 직접 선택</button></span></div>` : '';
     const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.quick.map(([sd, sg]) => `<button class="chip" data-act="region" data-s="${esc(sd)}" data-g="${esc(sg)}" aria-pressed="${!q.geo && q.sido === sd && q.sigungu === sg}">${esc(sg)}</button>`).join('')}</div>`;
     const nearNotice = nearestOnly && list.length ? `<div class="note" style="margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span>내 위치 반경 ${q.radius || 5}km 안에는 샘플 카페가 없어요. 가장 가까운 ${list.length}곳을 보여드려요. (가장 가까운 곳: ${km(list[0].d)})</span><button class="btn sm" data-act="geo">내 위치 해제</button></div>` : ``;
-    box.innerHTML = `${locNote}${realNote}${regionChips}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
+    box.innerHTML = `${locNote}${realNote}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
       <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}</small></div>
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
           <button class="tab map-toggle" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} ${q.view === 'map' ? '목록만 보기' : '지도로 보기'}</button></div></div>
@@ -740,9 +715,9 @@
       <div class="dhead"><div><h1>${esc(c.name)}</h1>
         <div class="meta"><span>${ico('pin', 16)}${esc(c.addr)}</span>${c.station ? `<span>${ico('train', 16)}${esc(c.station)}</span>` : ''}<span>${ico('clock', 16)}${hoursText(c)}</span><span><b style="color:var(--gold)">★</b> ${r.n ? r.avg.toFixed(1) : '-'} (${r.n})</span></div></div>
         <div class="chips">${c.fac.map((f) => `<span class="chip">${ico(FACICO[f], 15)}${FAC[f]}</span>`).join('')}</div></div>
-      <div class="gallery">${[0, 1, 2, 3, 4].map((i) => `<figure>${photo(c, i)}<figcaption>${PHOTO_LABEL[i]}</figcaption></figure>`).join('')}</div>
-      <p class="photonote">시설 사진은 샘플 일러스트입니다.</p>
-      ${c.real ? `<p class="note" style="margin:12px 0 0">이 카페의 <b>이름·주소·전화번호·위치</b>는 카카오맵 정보이고, <b>요금·좌석 수·시설·사진은 예시</b>예요. 실제 정보는 ${c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">카카오맵에서 확인</a>` : '카카오맵에서 확인'}해 주세요.</p>` : ''}
+      <div class="gallery gallery-one"><figure>${photo(c, 0)}</figure></div>
+      <p class="photonote">${c.real && c.url ? `사진은 <a href="${esc(c.url)}" target="_blank" rel="noopener">카카오맵에서 보기 ↗</a>` : '사진은 준비 중이에요.'}</p>
+      ${c.real ? `<p class="note" style="margin:12px 0 0">이 카페의 <b>이름·주소·전화번호·위치</b>는 카카오맵 정보이고, <b>요금·좌석 수는 예시</b>예요. 실제 정보는 ${c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">카카오맵에서 확인</a>` : '카카오맵에서 확인'}해 주세요.</p>` : ''}
       <div class="dlayout"><div class="dmain">
         <nav class="subnav" aria-label="상세 메뉴">${[['sec-price', '가격'], ['sec-seats', '좌석 현황'], ['sec-fac', '시설'], ['sec-loc', '위치·운영'], ['sec-rev', `후기 ${r.n}`]].map(([i, t]) => `<button data-act="nav" data-to="${i}">${t}</button>`).join('')}</nav>
         <section class="dsec" id="sec-price"><h2>${ico('chart', 20)}가격 정보${c.real ? ' <small class="muted" style="font-size:13px;font-weight:400">(예시 요금)</small>' : ''}</h2>${priceTable(c)}</section>
