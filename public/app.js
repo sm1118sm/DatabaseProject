@@ -113,7 +113,7 @@
     seat: 'ANY', people: 1, fac: [], sido: '서울특별시', sigungu: '강남구', radius: 0, geo: null,
     nearStation: false, nearUniv: false, sort: 'price', view: 'map',
   });
-  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, kakao: false, mapStatus: 'loading', realStatus: 'none', limit: 12, adv: false };
+  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, kakao: false, mapStatus: 'loading', realStatus: 'none', limit: 12, adv: false, facMore: false };
   // 실제 데이터로 교체되면서 빠진 샘플 카페도 찾을 수 있게 보관한다 (예약 내역 표시용)
   const archived = [];
   const cafeById = (id) => D.cafes.find((c) => c.id === Number(id)) || archived.find((c) => c.id === Number(id));
@@ -236,6 +236,10 @@
     const sidos = [...new Set(D.regions.map((r) => r.sido))];
     const sigs = D.regions.filter((r) => r.sido === q.sido);
     const base = q.geo ? '현재 위치' : `${regionOf().label} (${q.sigungu} 중심)`;
+    // 시설 옵션은 앞의 4개만 보여주고 나머지는 '+ 더보기'로 펼친다 (이미 선택한 칩은 항상 보인다)
+    const facAll = Object.entries(FAC);
+    const facShown = S.facMore ? facAll : facAll.filter(([k], i) => i < 4 || q.fac.includes(k));
+    const facHidden = facAll.length - facShown.length;
     const advCount = (q.seat !== 'ANY' ? 1 : 0) + (q.people > 1 ? 1 : 0) + q.fac.length + (q.radius ? 1 : 0) + (q.geo ? 1 : 0) + (q.nearStation ? 1 : 0) + (q.nearUniv ? 1 : 0);
     return `<div class="panel-grid">
       <div class="pgroup" id="sec-opt">
@@ -265,7 +269,7 @@
             <div class="stepper"><button data-act="people" data-v="-1" aria-label="인원 줄이기">−</button><span>${q.people}명</span><button data-act="people" data-v="1" aria-label="인원 늘리기">+</button></div>
             ${q.people > 1 ? '<p class="note">2인 이상은 스터디룸만 예약할 수 있어요.</p>' : ''}</div></div>
           <div class="field" style="margin-bottom:0"><span class="lbl">시설 옵션</span><div class="chips">
-            ${Object.entries(FAC).map(([k, t]) => `<button class="chip" data-act="fac" data-v="${k}" aria-pressed="${q.fac.includes(k)}" ${realMode() ? FAC_OFF : ''}>${ico(FACICO[k], 15)}${t}</button>`).join('')}</div>
+            ${facShown.map(([k, t]) => `<button class="chip" data-act="fac" data-v="${k}" aria-pressed="${q.fac.includes(k)}" ${realMode() ? FAC_OFF : ''}>${ico(FACICO[k], 15)}${t}</button>`).join('')}${facHidden > 0 ? `<button class="chip more" data-act="facmore">+ 더보기 ${facHidden}</button>` : S.facMore ? '<button class="chip more" data-act="facmore">접기</button>' : ''}</div>
             ${realMode() ? '<p class="note" style="margin-top:8px">카카오맵 데이터에는 시설·좌석 유형·운영 시간 정보가 없어서, 이 항목들은 목록을 걸러내지 못해요. 요금 표시만 바뀌어요.</p>' : ''}</div>
         </div>
         <div class="pgroup">
@@ -710,7 +714,7 @@
     box.innerHTML = `<h3>예약하기</h3>
       <div class="field"><span class="lbl">이용 형태</span><div class="seg"><button data-act="bmode" data-v="HOURLY" aria-pressed="${b.mode === 'HOURLY'}">시간제</button><button data-act="bmode" data-v="PERIOD" aria-pressed="${b.mode === 'PERIOD'}" ${b.type === 'ROOM' ? 'disabled title="스터디룸은 시간제만 가능해요"' : ''}>기간제</button></div></div>
       <div class="field"><span class="lbl">좌석 유형</span><div class="seg">${['NORMAL', 'FOCUS', 'ROOM'].map((t) => `<button data-act="btype" data-v="${t}" aria-pressed="${b.type === t}">${SEAT[t]}</button>`).join('')}</div></div>
-      ${b.mode === 'HOURLY' ? `<div class="row3" style="grid-template-columns:1.3fr 1fr 1fr">
+      ${b.mode === 'HOURLY' ? `<div class="row3">
           <div class="field"><label for="bDate">날짜</label><input id="bDate" type="date" data-b="date" min="${todayStr()}" value="${esc(b.date)}"></div>
           <div class="field"><label for="bStart">시작</label><select id="bStart" data-b="start">${timeOptions(b.start, c.open, c.close - 1)}</select></div>
           <div class="field"><label for="bEnd">종료</label><select id="bEnd" data-b="end">${timeOptions(b.end, b.start + 1, c.close)}</select></div></div>`
@@ -925,6 +929,7 @@
     open: (t) => { location.hash = 'cafe-' + t.dataset.id; },
     // ① 이용 옵션
     adv: () => { S.adv = !S.adv; refreshPanel(); },
+    facmore: () => { S.facMore = !S.facMore; refreshPanel(); },
     mode: (t) => { S.q.mode = t.dataset.v; afterQuery(); },
     plan: (t) => { S.q.plan = t.dataset.v; afterQuery(); },
     seat: (t) => { S.q.seat = t.dataset.v; if (S.q.seat !== 'ROOM' && S.q.people > 1) S.q.people = 1; if (S.q.seat === 'ROOM' && S.q.people < 2) S.q.people = 1; afterQuery(); },
