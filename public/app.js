@@ -90,7 +90,7 @@
     nearStation: false, nearUniv: false, sort: 'price', view: 'map',
   });
   const PAGE = Infinity; // 목록은 나누지 않고 선택한 지역의 카페를 전부 보여준다
-  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, me: null, locating: false, kakao: false, mapStatus: 'loading', regionDone: new Set(), inflight: new Map(), regionLoading: null, regionError: null, limit: Infinity, adv: false, facMore: false };
+  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, me: null, locating: false, kakao: false, mapStatus: 'loading', regionDone: new Set(), regionTime: new Map(), inflight: new Map(), regionLoading: null, regionError: null, limit: Infinity, adv: false, facMore: false };
   // 실제 데이터로 교체되면서 빠진 샘플 카페도 찾을 수 있게 보관한다 (예약 내역 표시용)
   const archived = [];
   const cafeById = (id) => D.cafes.find((c) => c.id === Number(id)) || archived.find((c) => c.id === Number(id));
@@ -379,10 +379,12 @@
       : '';
     const why = { denied: '위치 권한이 꺼져 있어', unavailable: '현재 위치를 확인하지 못해', abroad: '내 위치 주변에서 지역 정보를 찾지 못해', unsupported: '이 브라우저에서는 위치 기능을 쓸 수 없어' }[S.locFail];
     const locNote = !S.me && why ? `<div class="locnote"><span>${why} <b>${esc(q.sido)} ${esc(q.sigungu)}</b> 기준으로 보여드려요.</span><span class="locbtns">${['denied', 'unavailable'].includes(S.locFail) ? '<button class="btn sm" data-act="locHelp">위치 허용 방법</button>' : ''}${S.locFail !== 'unsupported' ? '<button class="btn sm" data-act="locRetry">다시 시도</button>' : ''}<button class="btn sm" data-act="goArea">지역 직접 선택</button></span></div>` : '';
+    const t0 = !q.geo && S.regionTime.get(regKey(regionOf()));
+    const asof = t0 && realMode() ? `카카오맵 ${ago(t0)} 기준` : '';
     const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.quick.map(([sd, sg]) => `<button class="chip" data-act="region" data-s="${esc(sd)}" data-g="${esc(sg)}" aria-pressed="${!q.geo && q.sido === sd && q.sigungu === sg}">${esc(sg)}</button>`).join('')}</div>`;
     const nearNotice = nearestOnly && list.length ? `<div class="note" style="margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span>내 위치 반경 ${q.radius || 5}km 안에는 카페가 없어요. 반경 밖의 카페 ${list.length}곳을 가까운 순으로 모두 보여드려요. (가장 가까운 곳: ${km(list[0].d)})</span><button class="btn sm" data-act="geo">내 위치 해제</button></div>` : ``;
     box.innerHTML = `${locNote}${realNote}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
-      <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}</small></div>
+      <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}${asof ? ` · ${asof}` : ''}</small></div>
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
           <button class="tab map-toggle" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} ${q.view === 'map' ? '목록만 보기' : '지도로 보기'}</button></div></div>
       <div class="reslayout${q.view === 'map' ? ' withmap' : ''}"><div><ul class="grid">${list.length ? shown.map((it, i) => cardHtml(it, i)).join('') : empty}</ul>${list.length > shown.length ? `<div style="text-align:center;margin-top:18px"><button class="btn" data-act="more">더 보기 (${shown.length}/${list.length})</button></div>` : ''}</div>${q.view === 'map' ? '<div class="mapbox" id="mapbox"></div>' : ''}</div>`;
@@ -520,13 +522,15 @@
   // 이름·주소·전화번호·좌표·카카오맵 링크·가까운 역/대학은 카카오 정보다.
   // 카카오는 요금·좌석 수·시설·사진·후기를 주지 않으므로 요금과 좌석 수는 예시 값(c.real 로 표시)이다.
   // 전국 시·군·구를 한꺼번에 가져오면 호출이 너무 많아서, 사용자가 고른 시·군·구만 그때 검색하고 24시간 저장한다.
+  // 정보를 받은 지 얼마나 지났는지 (예: 방금, 12분 전, 3시간 전)
+  const ago = (t) => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : `${Math.floor(m / 60)}시간 전`; };
   const regKey = (r) => `${r.sido}|${r.sigungu}`;
   const REGION_MEMO = 'studymoa:lastRegion';
   const rememberRegion = () => { try { localStorage.setItem(REGION_MEMO, JSON.stringify([S.q.sido, S.q.sigungu])); } catch { /* 저장소 사용 불가 */ } };
   function restoreRegion() { // 위치를 못 받았을 때를 위해, 마지막에 직접 고른 지역으로 시작한다
     try { const m = JSON.parse(localStorage.getItem(REGION_MEMO) || 'null'); if (m && D.regions.some((r) => r.sido === m[0] && r.sigungu === m[1])) { S.q.sido = m[0]; S.q.sigungu = m[1]; } } catch { /* 저장된 지역 없음 */ }
   }
-  const regCacheKey = (r) => `studymoa:r:v1:${regKey(r)}`;
+  const regCacheKey = (r) => `studymoa:r:v2:${regKey(r)}`; // 매칭 규칙을 고칠 때마다 버전을 올려 이전 결과를 버린다
   // 카카오 주소(예: '서울 강남구 역삼동', '충남 천안시 서북구 ...')가 이 시·군·구에 속하는지
   // 시·도는 전체 이름('세종특별자치시', '강원특별자치도')이나 줄임말('충북', '경기') 어느 쪽으로 시작해도 인정한다. 세종은 시·군·구가 없다.
   const addrOk = (addr, r) => [r.sido, ...(D.ALIAS[r.sido] || [])].some((a) => addr.startsWith(a)) && (r.sigungu === r.sido || new RegExp(`(^| )${r.sigungu}( |$)`).test(addr));
@@ -557,7 +561,7 @@
   function readRegionCache(reg) {
     try {
       const o = JSON.parse(localStorage.getItem(regCacheKey(reg)) || 'null');
-      if (o && Date.now() - o.t < 864e5 && Array.isArray(o.cafes)) return o.cafes;
+      if (o && Date.now() - o.t < 864e5 && Array.isArray(o.cafes)) { S.regionTime.set(regKey(reg), o.t); return o.cafes; }
     } catch { /* 저장된 데이터 없음 */ }
     return null;
   }
@@ -628,6 +632,7 @@
       S.regionLoading = key;
       S.inflight.set(key, scanRegion(reg).then((list) => {
         applyRegion(reg, list);
+        S.regionTime.set(key, Date.now());
         try { localStorage.setItem(regCacheKey(reg), JSON.stringify({ t: Date.now(), cafes: list })); } catch { /* 저장소 사용 불가 */ }
       }).catch(() => { S.regionError = key; }).finally(() => {
         S.regionDone.add(key); S.inflight.delete(key);
@@ -1126,6 +1131,8 @@
     $('#logoMark2').innerHTML = ico('book', 20);
     await seedDemo();
     renderUser();
+    const ra = $('#regAsof'); if (ra) ra.textContent = window.SC_REGIONS_ASOF || '';
+    try { Object.keys(localStorage).filter((k) => /^studymoa:r:v1:|^studymoa:real:/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch { /* 저장소 사용 불가 */ } // 쓰지 않는 옛 저장본 정리
     restoreRegion();
     ensureRegion(regionOf()); // 이전에 불러온 실제 카페가 저장돼 있으면 처음부터 실제 이름으로 보여준다
     // 웹사이트를 켤 때마다 현재 위치를 받아 내 주변 기준으로 바꾼다 (거부하면 선택한 지역 기준)
