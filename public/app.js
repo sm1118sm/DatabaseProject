@@ -417,9 +417,11 @@
     const shown = list.slice(0, S.limit);
     const realNote = S.regionLoading ? `<p class="note" style="margin-bottom:12px">카카오맵에서 ${esc(q.sigungu)} 스터디카페를 불러오는 중이에요…</p>`
       : '';
+    const why = { denied: '위치 권한이 꺼져 있어', unavailable: '현재 위치를 확인하지 못해', abroad: '내 위치 주변에서 지역 정보를 찾지 못해', unsupported: '이 브라우저에서는 위치 기능을 쓸 수 없어' }[S.locFail];
+    const locNote = !S.me && why ? `<div class="locnote"><span>${why} <b>${esc(q.sido)} ${esc(q.sigungu)}</b> 기준으로 보여드려요.</span><span class="locbtns">${['denied', 'unavailable'].includes(S.locFail) ? '<button class="btn sm" data-act="locHelp">위치 허용 방법</button>' : ''}${S.locFail !== 'unsupported' ? '<button class="btn sm" data-act="locRetry">다시 시도</button>' : ''}<button class="btn sm" data-act="goArea">지역 직접 선택</button></span></div>` : '';
     const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.quick.map(([sd, sg]) => `<button class="chip" data-act="region" data-s="${esc(sd)}" data-g="${esc(sg)}" aria-pressed="${!q.geo && q.sido === sd && q.sigungu === sg}">${esc(sg)}</button>`).join('')}</div>`;
     const nearNotice = nearestOnly && list.length ? `<div class="note" style="margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span>내 위치 반경 ${q.radius || 5}km 안에는 샘플 카페가 없어요. 가장 가까운 ${list.length}곳을 보여드려요. (가장 가까운 곳: ${km(list[0].d)})</span><button class="btn sm" data-act="geo">내 위치 해제</button></div>` : ``;
-    box.innerHTML = `${realNote}${regionChips}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
+    box.innerHTML = `${locNote}${realNote}${regionChips}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
       <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}</small></div>
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
           <button class="tab map-toggle" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} ${q.view === 'map' ? '목록만 보기' : '지도로 보기'}</button></div></div>
@@ -559,6 +561,11 @@
   // 카카오는 요금·좌석 수·시설·사진·후기를 주지 않으므로 요금과 좌석 수는 예시 값(c.real 로 표시)이다.
   // 전국 시·군·구를 한꺼번에 가져오면 호출이 너무 많아서, 사용자가 고른 시·군·구만 그때 검색하고 24시간 저장한다.
   const regKey = (r) => `${r.sido}|${r.sigungu}`;
+  const REGION_MEMO = 'studymoa:lastRegion';
+  const rememberRegion = () => { try { localStorage.setItem(REGION_MEMO, JSON.stringify([S.q.sido, S.q.sigungu])); } catch { /* 저장소 사용 불가 */ } };
+  function restoreRegion() { // 위치를 못 받았을 때를 위해, 마지막에 직접 고른 지역으로 시작한다
+    try { const m = JSON.parse(localStorage.getItem(REGION_MEMO) || 'null'); if (m && D.regions.some((r) => r.sido === m[0] && r.sigungu === m[1])) { S.q.sido = m[0]; S.q.sigungu = m[1]; } } catch { /* 저장된 지역 없음 */ }
+  }
   const regCacheKey = (r) => `studymoa:r:v1:${regKey(r)}`;
   // 카카오 주소(예: '서울 강남구 역삼동', '충남 천안시 서북구 ...')가 이 시·군·구에 속하는지
   // 시·도는 전체 이름('세종특별자치시', '강원특별자치도')이나 줄임말('충북', '경기') 어느 쪽으로 시작해도 인정한다. 세종은 시·군·구가 없다.
@@ -670,20 +677,20 @@
     return S.inflight.get(key);
   }
   // 현재 위치를 받아 거리 기준과 '내 주변' 모드로 설정한다. 한국 안(가장 가까운 시·군·구가 40km 이내)이 아니면 쓰지 않는다.
-  function locate(auto) {
-    if (!navigator.geolocation) { if (!auto) toast('이 브라우저에서는 위치 기능을 쓸 수 없어요.'); return Promise.resolve(false); }
+  function locate() {
+    if (!navigator.geolocation) { S.locFail = 'unsupported'; return Promise.resolve(false); }
     S.locating = true;
     return new Promise((resolve) => navigator.geolocation.getCurrentPosition((p) => {
       S.locating = false;
       const pt = [p.coords.latitude, p.coords.longitude];
       const near = D.regions.map((r) => ({ r, d: dist(pt, r.center) })).sort((a, b) => a.d - b.d)[0];
-      if (!near || near.d > 40) { toast('내 위치 주변에서 지역 정보를 찾지 못해 선택한 지역 기준으로 보여드려요.'); resolve(false); return; }
-      S.me = pt; S.q.geo = pt; if (!S.q.radius) S.q.radius = 5;
+      if (!near || near.d > 40) { S.locFail = 'abroad'; resolve(false); return; }
+      S.locFail = null; S.me = pt; S.q.geo = pt; if (!S.q.radius) S.q.radius = 5;
       S.q.sido = near.r.sido; S.q.sigungu = near.r.sigungu; // 지역 선택도 지금 있는 곳으로 맞춘다
       resolve(true);
-    }, () => {
+    }, (err) => {
       S.locating = false;
-      toast(auto ? '위치 권한이 없어 선택한 지역 기준으로 보여드려요. 주소창의 위치 아이콘에서 허용할 수 있어요.' : '위치를 가져올 수 없어요. 선택한 지역의 중심을 기준으로 찾을게요.');
+      S.locFail = err && err.code === 1 ? 'denied' : 'unavailable'; // 1 = 사용자가 거부
       resolve(false);
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }));
   }
@@ -1014,6 +1021,15 @@
     // ① 이용 옵션
     adv: () => { S.adv = !S.adv; refreshPanel(); },
     facmore: () => { S.facMore = !S.facMore; refreshPanel(); },
+    goArea: () => { const el = $('#sec-area'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); const sel = $('#qSido'); if (sel) setTimeout(() => sel.focus(), 400); } },
+    locRetry: () => { S.locFail = null; toast('위치를 확인하는 중이에요…'); locate().then((ok) => { if (ok) { refreshPanel(); refreshCats(); renderResults(); ensureNear(S.me, S.q.radius || 5).finally(() => onRealLoaded()); } else renderResults(); }); },
+    locHelp: () => openModal(`<h2>내 위치 허용하기</h2><p class="muted" style="margin:0 0 14px">한 번 거부하면 사이트가 다시 물어볼 수 없어서, 브라우저에서 직접 바꿔야 해요.</p>
+      <ol style="margin:0;padding-left:20px;display:grid;gap:10px;font-size:14px">
+        <li><b>Chrome·Edge</b>: 주소창 왼쪽의 자물쇠(또는 설정) 아이콘 → <b>사이트 설정</b> → 위치를 <b>허용</b>으로 바꿔요.</li>
+        <li><b>Safari(아이폰)</b>: 설정 → Safari → 위치 → 이 사이트를 <b>허용</b>으로 바꿔요.</li>
+        <li>바꾼 뒤 <b>다시 시도</b>를 누르거나 페이지를 새로고침해요.</li></ol>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px"><button class="btn" data-act="closeModal">닫기</button><button class="btn primary" data-act="locRetryClose">다시 시도</button></div>`),
+    locRetryClose: () => { closeModal(); ACT.locRetry(); },
     mode: (t) => { S.q.mode = t.dataset.v; afterQuery(); },
     plan: (t) => { S.q.plan = t.dataset.v; afterQuery(); },
     seat: (t) => { S.q.seat = t.dataset.v; if (S.q.seat !== 'ROOM' && S.q.people > 1) S.q.people = 1; if (S.q.seat === 'ROOM' && S.q.people < 2) S.q.people = 1; afterQuery(); },
@@ -1026,7 +1042,7 @@
       if (S.q.geo) { S.q.geo = null; afterQuery(); return; }
       if (S.me) { S.q.geo = S.me; if (!S.q.radius) S.q.radius = 5; afterQuery(); ensureNear(S.me, S.q.radius).finally(() => onRealLoaded()); return; }
       toast('위치를 확인하는 중이에요…');
-      locate(false).then((ok) => { if (ok) { afterQuery(); ensureNear(S.me, S.q.radius || 5).finally(() => onRealLoaded()); } });
+      locate().then((ok) => { if (ok) { afterQuery(); ensureNear(S.me, S.q.radius || 5).finally(() => onRealLoaded()); } else renderResults(); });
     },
     cat: (t) => {
       const { kind, v } = t.dataset;
@@ -1039,7 +1055,7 @@
     reset: () => { resetSearch(); document.querySelectorAll('.cat').forEach((b) => b.setAttribute('aria-pressed', 'false')); afterQuery(); },
     // ③ 비교·추천
     region: (t) => {
-      S.q.sido = t.dataset.s; S.q.sigungu = t.dataset.g; S.q.geo = null; afterQuery();
+      S.q.sido = t.dataset.s; S.q.sigungu = t.dataset.g; S.q.geo = null; rememberRegion(); afterQuery();
       const pr = ensureRegion(regionOf()); renderResults(); pr.finally(() => onRealLoaded()); // 고른 구를 불러온다
     },
     sort: (t) => { S.q.sort = t.dataset.v; S.limit = 12; renderResults(); },
@@ -1102,7 +1118,7 @@
       if (['sido', 'sigungu', 'start', 'radius'].includes(k)) refreshPanel(); else if (k === 'date') { const p = $('#panel .panel-foot .muted'); if (p) refreshPanel(); }
       S.limit = 12;
       renderResults();
-      if (k === 'sido' || k === 'sigungu') { const pr = ensureRegion(regionOf()); renderResults(); pr.finally(() => onRealLoaded()); } // 고른 구를 불러온다
+      if (k === 'sido' || k === 'sigungu') { rememberRegion(); const pr = ensureRegion(regionOf()); renderResults(); pr.finally(() => onRealLoaded()); } // 고른 구를 불러온다
       else if (k === 'radius' && q.geo) ensureNear(q.geo, q.radius || 5).finally(() => onRealLoaded());
     } else if (t.dataset.b) { // 예약 카드 입력
       const k = t.dataset.b, b = S.book, c = cafeById(b.cafeId);
@@ -1128,10 +1144,11 @@
     $('#logoMark2').innerHTML = ico('book', 20);
     await seedDemo();
     renderUser();
+    restoreRegion();
     ensureRegion(regionOf()); // 이전에 불러온 실제 카페가 저장돼 있으면 처음부터 실제 이름으로 보여준다
     // 웹사이트를 켤 때마다 현재 위치를 받아 내 주변 기준으로 바꾼다 (거부하면 선택한 지역 기준)
-    locate(true).then((ok) => {
-      if (!ok) return;
+    locate().then((ok) => {
+      if (!ok) { renderResults(); return; } // 못 받았으면 이유를 알려주는 안내 줄을 보여준다
       refreshPanel(); refreshCats(); renderResults();
       ensureNear(S.me, S.q.radius || 5).finally(() => onRealLoaded());
     });
