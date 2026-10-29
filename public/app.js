@@ -387,16 +387,25 @@
   // ---- 지도: 카카오 키가 있으면 실제 지도, 없으면 간이 지도 ------------------------------------
   function drawMap(el, items, org, hlId) {
     if (!el) return;
-    if (S.kakao && window.kakao && kakao.maps) {
+    if (S.kakao && window.kakao && kakao.maps && (items.length || org)) {
       el.innerHTML = '<div class="kmap"></div>';
-      const map = new kakao.maps.Map($('.kmap', el), { center: new kakao.maps.LatLng(org[0], org[1]), level: 6 });
+      const ctr = org || [items[0].c.lat, items[0].c.lng];
+      const map = new kakao.maps.Map($('.kmap', el), { center: new kakao.maps.LatLng(ctr[0], ctr[1]), level: 5 });
       const bounds = new kakao.maps.LatLngBounds();
-      items.forEach(({ c }) => {
-        const pos = new kakao.maps.LatLng(c.lat, c.lng), m = new kakao.maps.Marker({ map, position: pos, title: c.name });
-        kakao.maps.event.addListener(m, 'click', () => { location.hash = 'cafe-' + c.id; });
+      items.forEach(({ c, p, diff }) => { // 가격이 적힌 말풍선 마커
+        const pos = new kakao.maps.LatLng(c.lat, c.lng), b = document.createElement('button');
+        b.className = 'kpin'; b.setAttribute('aria-label', c.name);
+        b.innerHTML = `<span class="bubble ${diff < 0 ? 'low' : diff > 0 ? 'high' : ''}">${p.toLocaleString('ko-KR')}</span>`;
+        b.onclick = () => { if (items.length > 1) { S.hl = c.id; renderResults(); } else location.hash = 'cafe-' + c.id; };
+        new kakao.maps.CustomOverlay({ map, position: pos, content: b, xAnchor: 0.5, yAnchor: 1 });
         bounds.extend(pos);
       });
-      if (items.length) map.setBounds(bounds);
+      if (org) {
+        const dot = document.createElement('span'); dot.className = 'origin'; dot.title = '기준 위치';
+        new kakao.maps.CustomOverlay({ map, position: new kakao.maps.LatLng(org[0], org[1]), content: dot, xAnchor: 0.5, yAnchor: 0.5 });
+        bounds.extend(new kakao.maps.LatLng(org[0], org[1]));
+      }
+      if (items.length > 1) map.setBounds(bounds);
       return;
     }
     const pts = items.map((i) => [i.c.lat, i.c.lng]);
@@ -410,15 +419,22 @@
       ${org ? `<span class="origin" style="${pos(org[0], org[1])}" title="기준 위치"></span>` : ''}
       <span class="maplabel">간이 지도 · 파란 점은 기준 위치</span>`;
   }
+  // 키는 public/config.js 의 window.KAKAO_JS_KEY (정적 배포용), 없으면 서버의 /api/config 에서 받는다.
+  // 키가 없거나 SDK 를 불러오지 못하면 간이 지도를 그대로 쓴다.
   function initKakao() {
-    if (window.DEMO_ONLY) return;
-    fetch('/api/config').then((r) => (r.ok ? r.json() : {})).then((cfg) => {
-      if (!cfg.kakaoJsKey) return;
+    const load = (key) => {
       const s = document.createElement('script');
-      s.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(cfg.kakaoJsKey)}&autoload=false`;
-      s.onload = () => kakao.maps.load(() => { S.kakao = true; renderResults(); });
+      s.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&autoload=false`;
+      s.onload = () => kakao.maps.load(() => {
+        S.kakao = true; renderResults();
+        const mini = $('#miniMap');
+        if (mini && S.book) { const c = cafeById(S.book.cafeId); drawMap(mini, [{ c, p: price(c, 'NORMAL', 'HOURLY'), diff: 0 }], null, c.id); }
+      });
       document.head.appendChild(s);
-    }).catch(() => { /* 서버가 없으면 간이 지도를 쓴다 */ });
+    };
+    if (window.KAKAO_JS_KEY) { load(window.KAKAO_JS_KEY); return; }
+    if (window.DEMO_ONLY) return;
+    fetch('/api/config').then((r) => (r.ok ? r.json() : {})).then((cfg) => { if (cfg.kakaoJsKey) load(cfg.kakaoJsKey); }).catch(() => { /* 서버가 없다 */ });
   }
 
   // =====================================================================================
