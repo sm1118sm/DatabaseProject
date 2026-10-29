@@ -554,7 +554,8 @@
   const regKey = (r) => `${r.sido}|${r.sigungu}`;
   const regCacheKey = (r) => `studymoa:r:v1:${regKey(r)}`;
   // 카카오 주소(예: '서울 강남구 역삼동', '충남 천안시 서북구 ...')가 이 시·군·구에 속하는지
-  const addrOk = (addr, r) => (D.ALIAS[r.sido] || []).some((a) => addr.startsWith(a)) && new RegExp(`(^| )${r.sigungu}( |$)`).test(addr);
+  // 시·도는 전체 이름('세종특별자치시', '강원특별자치도')이나 줄임말('충북', '경기') 어느 쪽으로 시작해도 인정한다. 세종은 시·군·구가 없다.
+  const addrOk = (addr, r) => [r.sido, ...(D.ALIAS[r.sido] || [])].some((a) => addr.startsWith(a)) && (r.sigungu === r.sido || new RegExp(`(^| )${r.sigungu}( |$)`).test(addr));
   function fromPlace(p, region) {
     const id = Number(p.id), r = (k) => hash(`${id}|${k}`);
     return {
