@@ -41,6 +41,9 @@ window.SC_DATA = (() => {
     return () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   }
   const round = (n, u) => Math.round(n / u) * u;
+  // 일반석 시간당 요금 n 으로 좌석 유형별 요금표를 만든다 (샘플 요금 계산식)
+  const plans = (h) => ({ hourly: h, DAY: round(h * 5, 1000), WEEK: round(h * 25, 1000), MONTH: round(h * 65, 1000) });
+  const makePrice = (n) => ({ NORMAL: plans(n), FOCUS: plans(round(n + 700, 100)), ROOM: { hourly: round(n * 3, 100) } });
 
   const NAMES = ['김*준', '이*서', '박*우', '최*아', '정*민', '강*현', '조*은', '윤*호', '장*빈', '임*진', '한*솔', '오*지'];
   const TEXTS = [
@@ -62,8 +65,6 @@ window.SC_DATA = (() => {
     const [name, sido, sigungu, addr, lat, lng, open, close, n, seats, cap, facCodes, st, un, busy] = r;
     const f = [...new Set(facCodes.split(''))];
     if (open === 0 && close === 24 && !f.includes('h')) f.push('h');
-    const focus = round(n + 700, 100);
-    const plans = (h) => ({ hourly: h, DAY: round(h * 5, 1000), WEEK: round(h * 25, 1000), MONTH: round(h * 65, 1000) });
     const rnd = rng(i * 97 + 13);
     const count = 3 + Math.floor(rnd() * 5);
     const reviews = Array.from({ length: count }, (_, k) => {
@@ -74,10 +75,10 @@ window.SC_DATA = (() => {
     return {
       id: i + 1, name, sido, sigungu, addr, lat, lng, open, close, busy,
       seats: { NORMAL: seats[0], FOCUS: seats[1], ROOM: seats[2] }, roomCap: cap, fac: f, station: st, univ: un,
-      price: { NORMAL: plans(n), FOCUS: plans(focus), ROOM: { hourly: round(n * 3, 100) } },
+      price: makePrice(n),
       reviews,
     };
   });
 
-  return { FAC, SEAT, PLAN, DAYS, regions, cafes };
+  return { FAC, SEAT, PLAN, DAYS, regions, cafes, makePrice };
 })();

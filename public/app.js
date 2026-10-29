@@ -69,6 +69,7 @@
     list: 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01',
     card: 'M3 6h18v12H3zM3 10h18M7 15h3',
     target: 'M12 21a9 9 0 100-18 9 9 0 000 18zM12 16a4 4 0 100-8 4 4 0 000 8zM12 12h.01',
+    phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z',
   };
   const ico = (n, s = 18) => `<svg class="ico" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[n]}"/></svg>`;
   const FACICO = { s: 'snack', p: 'printer', l: 'locker', h: 'moon', e: 'plug', w: 'shower', g: 'sofa' };
@@ -112,8 +113,10 @@
     seat: 'ANY', people: 1, fac: [], sido: '서울특별시', sigungu: '강남구', radius: 0, geo: null,
     nearStation: false, nearUniv: false, sort: 'price', view: 'map',
   });
-  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, kakao: false };
-  const cafeById = (id) => D.cafes.find((c) => c.id === Number(id));
+  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, kakao: false, mapStatus: 'loading', realStatus: 'none', limit: 12 };
+  // 실제 데이터로 교체되면서 빠진 샘플 카페도 찾을 수 있게 보관한다 (예약 내역 표시용)
+  const archived = [];
+  const cafeById = (id) => D.cafes.find((c) => c.id === Number(id)) || archived.find((c) => c.id === Number(id));
 
   // 이용 형태·좌석 유형의 실제 적용값 (2인 이상은 스터디룸, 룸은 시간제만)
   const effSeat = () => (S.q.people > 1 ? 'ROOM' : S.q.seat === 'ANY' ? 'NORMAL' : S.q.seat);
@@ -149,7 +152,7 @@
   const regionOf = () => D.regions.find((r) => r.sido === S.q.sido && r.sigungu === S.q.sigungu) || D.regions[0];
   const origin = () => S.q.geo || regionOf().center;
   const isOpen = (c, o) => o.mode === 'PERIOD' || (c.open <= o.start && c.close >= o.end);
-  const hoursText = (c) => (c.open === 0 && c.close === 24 ? '24시간 운영' : `${hh(c.open)} – ${hh(c.close)}`);
+  const hoursText = (c) => (c.real ? '운영 시간은 카카오맵에서 확인해 주세요' : c.open === 0 && c.close === 24 ? '24시간 운영' : `${hh(c.open)} – ${hh(c.close)}`);
 
   // ---- 좌석 현황 (샘플: 날짜·시간에 따라 일정하게 만든 점유 + 내 예약) ----------------------
   const iv = (o) => {
@@ -206,6 +209,11 @@
     ['프린터', 'printer', 'fac', 'p'], ['역세권', 'train', 'near', 'nearStation'], ['대학가', 'school', 'near', 'nearUniv'], ['사물함', 'locker', 'fac', 'l'],
   ];
   const catOn = (kind, val) => (kind === 'fac' ? S.q.fac.includes(val) : kind === 'seat' ? S.q.seat === val : S.q[val]);
+  // 보고 있는 지역(또는 내 위치 모드)에 카카오에서 가져온 실제 카페가 있으면, 카카오가 시설 정보를 주지 않아 시설 필터를 쓸 수 없다
+  const realMode = () => D.cafes.some((c) => c.real && (S.q.geo || (c.sido === S.q.sido && c.sigungu === S.q.sigungu)));
+  const FAC_OFF = 'disabled title="카카오맵 데이터에는 시설 정보가 없어요"';
+  const catsHtml = () => CATS.map(([t, ic, kind, val]) => `<button class="cat" data-act="cat" data-kind="${kind}" data-v="${val}" aria-pressed="${!!catOn(kind, val)}" ${kind === 'fac' && realMode() ? FAC_OFF : ''}><span class="ci">${ico(ic, 24)}</span>${t}</button>`).join('');
+  const refreshCats = () => { const e = $('#cats'); if (e) e.innerHTML = catsHtml(); };
 
   function timeOptions(sel, from, to) {
     let s = '';
@@ -242,7 +250,8 @@
           <div class="stepper"><button data-act="people" data-v="-1" aria-label="인원 줄이기">−</button><span>${q.people}명</span><button data-act="people" data-v="1" aria-label="인원 늘리기">+</button></div>
           ${q.people > 1 ? '<p class="note">2인 이상은 스터디룸만 예약할 수 있어요.</p>' : ''}</div></div>
         <div class="field" style="margin-bottom:0"><span class="lbl">시설 옵션</span><div class="chips">
-          ${Object.entries(FAC).map(([k, t]) => `<button class="chip" data-act="fac" data-v="${k}" aria-pressed="${q.fac.includes(k)}">${ico(FACICO[k], 15)}${t}</button>`).join('')}</div></div>
+          ${Object.entries(FAC).map(([k, t]) => `<button class="chip" data-act="fac" data-v="${k}" aria-pressed="${q.fac.includes(k)}" ${realMode() ? FAC_OFF : ''}>${ico(FACICO[k], 15)}${t}</button>`).join('')}</div>
+          ${realMode() ? '<p class="note" style="margin-top:8px">카카오맵 데이터에는 시설·좌석 유형·운영 시간 정보가 없어서, 이 항목들은 목록을 걸러내지 못해요. 요금 표시만 바뀌어요.</p>' : ''}</div>
       </div>
       <div class="pgroup" id="sec-area">
         <h3><span class="step">2</span>지역 설정</h3>
@@ -261,25 +270,31 @@
     </div>
     <div class="panel-foot">
       <span class="muted">${v.type === 'ROOM' ? '스터디룸' : SEAT[v.type]} · ${v.mode === 'HOURLY' ? `${fmtDate(q.date)} ${hh(q.start)}–${hh(q.end)}` : `${PLAN[q.plan]} (${fmtDate(q.date)} 시작)`}${q.people > 1 ? ` · ${q.people}명` : ''}</span>
-      <span style="display:flex;gap:8px"><button class="btn" data-act="reset">조건 초기화</button><button class="btn primary lg" data-act="search">${ico('search', 18)}조건에 맞는 스터디카페 보기</button></span>
+      <span class="panel-actions"><button class="btn" data-act="reset">조건 초기화</button><button class="btn primary lg" data-act="search">${ico('search', 18)}조건에 맞는 스터디카페 보기</button></span>
     </div>`;
   }
   const refreshPanel = () => { const p = $('#panel'); if (p) p.innerHTML = panelHtml(); };
 
+  function heroStats() {
+    const real = D.cafes.some((c) => c.real);
+    return `<div><b>${D.cafes.length}곳</b>등록된 스터디카페</div><div><b>${D.regions.length}개</b>비교 가능한 지역</div>`
+      + (real ? '<div><b>카카오맵</b>실제 매장 정보 연동</div>' : '<div><b>샘플</b>예시 데이터로 동작 중</div>');
+  }
   function showHome() {
-    const seatsTotal = D.cafes.reduce((s, c) => s + c.seats.NORMAL + c.seats.FOCUS + c.seats.ROOM, 0);
+    const realCount = D.cafes.filter((c) => c.real).length;
+    const reviewBlock = recentReviews();
     view.innerHTML = `
     <section class="hero"><div class="wrap">
       <span class="eyebrow">${ico('book', 15)}스터디카페 통합 예약·비교</span>
       <h1>우리 동네 스터디카페,<br><em>평균보다 얼마나 저렴할까?</em></h1>
       <p>이용 옵션과 지역만 고르면 조건에 맞는 스터디카페를 최저가 순으로 비교하고, 빈 좌석을 확인해 바로 예약할 수 있어요.</p>
-      <div class="hero-stats"><div><b>${D.cafes.length}곳</b>제휴 스터디카페</div><div><b>${D.regions.length}개</b>비교 가능한 지역</div><div><b>${seatsTotal.toLocaleString('ko-KR')}석</b>예약 가능한 좌석</div></div>
+      <div class="hero-stats">${heroStats()}</div>
     </div></section>
     <div class="wrap"><div class="panel" id="panel">${panelHtml()}</div></div>
 
     <section class="section"><div class="wrap">
       <div class="sec-head"><div><h2>이런 스터디카페는 어때요?</h2><p>자주 찾는 조건을 한 번에 적용해 보세요.</p></div></div>
-      <div class="cats">${CATS.map(([t, ic, kind, val]) => `<button class="cat" data-act="cat" data-kind="${kind}" data-v="${val}" aria-pressed="${!!catOn(kind, val)}"><span class="ci">${ico(ic, 24)}</span>${t}</button>`).join('')}</div>
+      <div class="cats" id="cats">${catsHtml()}</div>
     </div></section>
 
     <section class="section" id="sec-compare"><div class="wrap">
@@ -292,10 +307,10 @@
       ${flowHtml()}
     </div></section>
 
-    <section class="section"><div class="wrap">
-      <div class="sec-head"><div><h2>최근 이용 후기</h2><p>실제 이용자가 남긴 평점과 리뷰(샘플)</p></div></div>
-      <div class="revgrid">${recentReviews()}</div>
-    </div></section>`;
+    ${reviewBlock ? `<section class="section"><div class="wrap">
+      <div class="sec-head"><div><h2>최근 이용 후기</h2><p>${realCount ? '이 사이트에서 남긴 후기' : '샘플 후기'}</p></div></div>
+      <div class="revgrid">${reviewBlock}</div>
+    </div></section>` : ''}`;
     renderResults();
   }
 
@@ -324,7 +339,7 @@
       if (!q.geo && (c.sido !== q.sido || c.sigungu !== q.sigungu)) continue;
       const d = dist(org, [c.lat, c.lng]);
       if (q.radius && !ignoreRadius && d > q.radius) continue;
-      if (q.fac.some((f) => !c.fac.includes(f))) continue;
+      if (!c.real && q.fac.some((f) => !c.fac.includes(f))) continue; // 실제 카페는 시설 정보가 없어 시설로 거르지 않는다
       if (q.nearStation && !c.station) continue;
       if (q.nearUniv && !c.univ) continue;
       if (!isOpen(c, v)) continue;
@@ -356,14 +371,14 @@
     const seats = av.free === 0 ? '<span class="cseats none">만석 · 다른 시간 확인</span>' : `<span class="cseats${av.free <= 3 ? ' few' : ''}">잔여 ${av.free}/${av.total}석</span>`;
     const where = [c.station ? `<span>${ico('train', 14)}${esc(c.station)}</span>` : '', c.univ ? `<span>${ico('school', 14)}${esc(c.univ)}</span>` : ''].join('');
     return `<li class="card${S.hl === c.id ? ' hl' : ''}" id="card-${c.id}" data-act="open" data-id="${c.id}">
-      <div class="thumbbox">${photo(c, 0)}<div class="tags">${rank}<span class="tag ${cls}">${tag}</span>${c.fac.includes('h') ? '<span class="tag">24시간</span>' : ''}</div></div>
+      <div class="thumbbox">${photo(c, 0)}<div class="tags">${rank}<span class="tag ${cls}">${tag}</span>${c.fac.includes('h') ? '<span class="tag">24시간</span>' : ''}${c.real ? '<span class="tag">요금 예시</span>' : ''}</div></div>
       <div class="cbody">
         <div class="cname">${esc(c.name)}</div>
         <div class="cloc"><span>${ico('pin', 14)}${esc(c.sigungu)} · ${km(d)}</span>${where}</div>
         <div class="crate">${r.n ? `<span class="star">★</span> ${r.avg.toFixed(1)} <span class="muted">(${r.n})</span>` : '<span class="muted">후기 없음</span>'}</div>
         <div class="cfac">${c.fac.filter((f) => f !== 'h').slice(0, 4).map((f) => `<span>${FAC[f]}</span>`).join('')}</div>
         <div class="avgbar"><div class="track"><span class="mid"></span><span class="dot ${cls}" style="left:${pct}%"></span></div>${esc(c.sigungu)} 평균 ${won(avg)}</div>
-        <div class="cprice"><span class="p">${v.mode === 'HOURLY' ? '시간당' : PLAN[v.plan]} <b>${won(p)}</b></span>${seats}</div>
+        <div class="cprice"><span class="p">${v.mode === 'HOURLY' ? '시간당' : PLAN[v.plan]}${c.real ? ' (예시)' : ''} <b>${won(p)}</b></span>${seats}</div>
       </div></li>`;
   }
 
@@ -379,46 +394,77 @@
     const when = v.mode === 'HOURLY' ? `${fmtDate(v.date)} ${hh(v.start)}–${hh(v.end)}` : `${PLAN[v.plan]}`;
     const sorts = [['price', '최저가순'], ['distance', '거리순'], ['rating', '평점순'], ['diff', '평균 대비 저렴순']];
     const empty = `<li class="empty"><h3>조건에 맞는 스터디카페가 없어요</h3><p class="muted">${q.geo ? '내 주변에 샘플 카페가 없을 수 있어요. 지역을 직접 선택해 보세요.' : '시간이나 시설 조건을 줄여서 다시 찾아보세요.'}</p><button class="btn primary" data-act="reset">조건 초기화</button></li>`;
+    const shown = list.slice(0, S.limit);
+    const realNote = S.realStatus === 'loading' ? '<p class="note" style="margin-bottom:12px">카카오맵에서 실제 스터디카페를 불러오는 중이에요…</p>'
+      : S.realStatus === 'ready' ? '<p class="note" style="margin-bottom:12px">카페 이름·주소·위치는 카카오맵 정보이고, <b>요금과 좌석 수는 예시</b>예요. 카페를 누르면 카카오맵 링크가 있어요.</p>' : '';
     const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.regions.map((r) => `<button class="chip" data-act="region" data-s="${esc(r.sido)}" data-g="${esc(r.sigungu)}" aria-pressed="${!q.geo && q.sigungu === r.sigungu}">${esc(r.sigungu)}</button>`).join('')}</div>`;
     const nearNotice = nearestOnly && list.length ? `<div class="note" style="margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span>내 위치 반경 ${q.radius || 5}km 안에는 샘플 카페가 없어요. 가장 가까운 ${list.length}곳을 보여드려요. (가장 가까운 곳: ${km(list[0].d)})</span><button class="btn sm" data-act="geo">내 위치 해제</button></div>` : ``;
-    box.innerHTML = `${regionChips}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
+    box.innerHTML = `${realNote}${regionChips}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
       <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}</small></div>
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
-          <button class="tab" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} ${q.view === 'map' ? '목록만 보기' : '지도로 보기'}</button></div></div>
-      <div class="reslayout${q.view === 'map' ? ' withmap' : ''}"><ul class="grid">${list.length ? list.map((it, i) => cardHtml(it, i)).join('') : empty}</ul>${q.view === 'map' ? '<div class="mapbox" id="mapbox"></div>' : ''}</div>`;
-    if (q.view === 'map') drawMap($('#mapbox'), list, origin(), S.hl);
+          <button class="tab map-toggle" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} ${q.view === 'map' ? '목록만 보기' : '지도로 보기'}</button></div></div>
+      <div class="reslayout${q.view === 'map' ? ' withmap' : ''}"><div><ul class="grid">${list.length ? shown.map((it, i) => cardHtml(it, i)).join('') : empty}</ul>${list.length > shown.length ? `<div style="text-align:center;margin-top:18px"><button class="btn" data-act="more">더 보기 (${shown.length}/${list.length})</button></div>` : ''}</div>${q.view === 'map' ? '<div class="mapbox" id="mapbox"></div>' : ''}</div>`;
+    if (q.view === 'map') drawMap($('#mapbox'), shown, origin(), S.hl);
   }
 
-  // ---- 지도: 카카오 키가 있으면 실제 지도, 없으면 간이 지도 ------------------------------------
+  function mapNotice(el, message, retry = false) {
+    $('.mapnotice', el)?.remove();
+    el.insertAdjacentHTML('beforeend', `<div class="mapnotice" role="status"><span>${esc(message)}</span>${retry ? '<button class="btn sm" data-act="retryMap">다시 시도</button>' : ''}</div>`);
+  }
+  function refreshMaps() {
+    const hs = $('.hero-stats');
+    if (hs) hs.innerHTML = heroStats();
+    renderResults();
+    const mini = $('#miniMap');
+    if (mini && S.book) {
+      const c = cafeById(S.book.cafeId);
+      if (c) drawMap(mini, [{ c, p: price(c, 'NORMAL', 'HOURLY'), diff: 0 }], null, c.id, true);
+    }
+  }
+  let mapResizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(mapResizeTimer);
+    mapResizeTimer = setTimeout(refreshMaps, 150);
+  });
+
+  // ---- 지도: 로딩 상태와 실패 안내를 간이 지도 위에 표시한다. ----------------------------
   function drawMap(el, items, org, hlId, asImage = false) {
     if (!el) return;
     if (S.kakao && window.kakao && kakao.maps && (items.length || org)) {
-      el.innerHTML = '<div class="kmap"></div>';
-      if (asImage && items.length === 1 && kakao.maps.StaticMap) { // 움직이지 않는 이미지 지도
-        const { c, p, diff } = items[0];
-        new kakao.maps.StaticMap($('.kmap', el), { center: new kakao.maps.LatLng(c.lat, c.lng), level: 3 });
-        el.insertAdjacentHTML('beforeend', `<span class="pin on" style="left:50%;top:50%;z-index:4"><span class="bubble ${diff < 0 ? 'low' : diff > 0 ? 'high' : ''}">${p.toLocaleString('ko-KR')}</span></span>
-          <a class="maplink" href="https://map.kakao.com/link/map/${encodeURIComponent(c.name)},${c.lat},${c.lng}" target="_blank" rel="noopener">카카오맵에서 크게 보기 ↗</a>`);
+      try {
+        el.innerHTML = '<div class="kmap"></div>';
+        $('.kmap', el).addEventListener('error', (event) => {
+          if (event.target.tagName === 'IMG') mapNotice(el, '지도 이미지를 불러오지 못했어요. 네트워크 연결을 확인하고 다시 시도해 주세요.', true);
+        }, true);
+        if (asImage && items.length === 1 && kakao.maps.StaticMap) { // 움직이지 않는 이미지 지도
+          const { c, p, diff } = items[0];
+          new kakao.maps.StaticMap($('.kmap', el), { center: new kakao.maps.LatLng(c.lat, c.lng), level: 3 });
+          el.insertAdjacentHTML('beforeend', `<span class="pin on" style="left:50%;top:50%;z-index:4"><span class="bubble ${diff < 0 ? 'low' : diff > 0 ? 'high' : ''}">${p.toLocaleString('ko-KR')}</span></span>
+            <a class="maplink" href="https://map.kakao.com/link/map/${encodeURIComponent(c.name)},${c.lat},${c.lng}" target="_blank" rel="noopener">카카오맵에서 크게 보기 ↗</a>`);
+          return;
+        }
+        const ctr = org || [items[0].c.lat, items[0].c.lng];
+        const map = new kakao.maps.Map($('.kmap', el), { center: new kakao.maps.LatLng(ctr[0], ctr[1]), level: 5 });
+        const bounds = new kakao.maps.LatLngBounds();
+        items.forEach(({ c, p, diff }) => { // 가격이 적힌 말풍선 마커
+          const pos = new kakao.maps.LatLng(c.lat, c.lng), b = document.createElement('button');
+          b.className = 'kpin'; b.setAttribute('aria-label', c.name);
+          b.innerHTML = `<span class="bubble ${diff < 0 ? 'low' : diff > 0 ? 'high' : ''}">${p.toLocaleString('ko-KR')}</span>`;
+          b.onclick = () => { if (items.length > 1) { S.hl = c.id; renderResults(); } else location.hash = 'cafe-' + c.id; };
+          new kakao.maps.CustomOverlay({ map, position: pos, content: b, xAnchor: 0.5, yAnchor: 1 });
+          bounds.extend(pos);
+        });
+        if (org) {
+          const dot = document.createElement('span'); dot.className = 'origin'; dot.title = '기준 위치';
+          new kakao.maps.CustomOverlay({ map, position: new kakao.maps.LatLng(org[0], org[1]), content: dot, xAnchor: 0.5, yAnchor: 0.5 });
+          bounds.extend(new kakao.maps.LatLng(org[0], org[1]));
+        }
+        if (items.length > 1) map.setBounds(bounds);
         return;
+      } catch {
+        S.kakao = false;
+        S.mapStatus = 'error';
       }
-      const ctr = org || [items[0].c.lat, items[0].c.lng];
-      const map = new kakao.maps.Map($('.kmap', el), { center: new kakao.maps.LatLng(ctr[0], ctr[1]), level: 5 });
-      const bounds = new kakao.maps.LatLngBounds();
-      items.forEach(({ c, p, diff }) => { // 가격이 적힌 말풍선 마커
-        const pos = new kakao.maps.LatLng(c.lat, c.lng), b = document.createElement('button');
-        b.className = 'kpin'; b.setAttribute('aria-label', c.name);
-        b.innerHTML = `<span class="bubble ${diff < 0 ? 'low' : diff > 0 ? 'high' : ''}">${p.toLocaleString('ko-KR')}</span>`;
-        b.onclick = () => { if (items.length > 1) { S.hl = c.id; renderResults(); } else location.hash = 'cafe-' + c.id; };
-        new kakao.maps.CustomOverlay({ map, position: pos, content: b, xAnchor: 0.5, yAnchor: 1 });
-        bounds.extend(pos);
-      });
-      if (org) {
-        const dot = document.createElement('span'); dot.className = 'origin'; dot.title = '기준 위치';
-        new kakao.maps.CustomOverlay({ map, position: new kakao.maps.LatLng(org[0], org[1]), content: dot, xAnchor: 0.5, yAnchor: 0.5 });
-        bounds.extend(new kakao.maps.LatLng(org[0], org[1]));
-      }
-      if (items.length > 1) map.setBounds(bounds);
-      return;
     }
     const pts = items.map((i) => [i.c.lat, i.c.lng]);
     if (org) pts.push(org);
@@ -429,24 +475,128 @@
     el.innerHTML = `<div class="fakemap"></div>
       ${items.map(({ c, p, diff }) => `<button class="pin${hlId === c.id ? ' on' : ''}" style="${pos(c.lat, c.lng)}" data-act="pin" data-id="${c.id}" aria-label="${esc(c.name)}"><span class="bubble ${diff < 0 ? 'low' : diff > 0 ? 'high' : ''}">${p.toLocaleString('ko-KR')}</span></button>`).join('')}
       ${org ? `<span class="origin" style="${pos(org[0], org[1])}" title="기준 위치"></span>` : ''}
-      <span class="maplabel">간이 지도 · 파란 점은 기준 위치</span>`;
+      <span class="maplabel">간이 위치도${org ? ' · 파란 점은 기준 위치' : ''}</span>`;
+    if (items.length === 1) {
+      const c = items[0].c;
+      el.insertAdjacentHTML('beforeend', `<a class="maplink" href="https://map.kakao.com/link/map/${encodeURIComponent(c.name)},${c.lat},${c.lng}" target="_blank" rel="noopener">카카오맵에서 크게 보기 ↗</a>`);
+    }
+    if (S.mapStatus === 'loading') mapNotice(el, '카카오 지도를 불러오는 중이에요.');
+    else if (S.mapStatus === 'error') mapNotice(el, '카카오 지도를 불러오지 못해 간이 위치도를 표시해요.', true);
+    else if (S.mapStatus === 'unconfigured') mapNotice(el, '현재 간이 위치도를 표시하고 있어요.');
   }
   // 키는 public/config.js 의 window.KAKAO_JS_KEY (정적 배포용), 없으면 서버의 /api/config 에서 받는다.
   // 키가 없거나 SDK 를 불러오지 못하면 간이 지도를 그대로 쓴다.
   function initKakao() {
+    S.mapStatus = 'loading';
+    // SDK가 이미 준비된 경우 이미지 요청만 다시 시도한다.
+    if (S.kakao) { S.mapStatus = 'ready'; refreshMaps(); return; }
+    let settled = false;
+    let timer;
+    const finish = (status) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      S.mapStatus = status;
+      S.kakao = status === 'ready';
+      // 지도가 준비되면 카카오 장소 검색으로 실제 스터디카페를 불러온 뒤 화면을 갱신한다
+      if (S.kakao) loadReal().catch(() => { S.realStatus = 'error'; }).finally(() => onRealLoaded());
+      else refreshMaps();
+    };
+    timer = setTimeout(() => finish('error'), 12000);
     const load = (key) => {
+      document.getElementById('kakao-sdk')?.remove();
       const s = document.createElement('script');
-      s.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&autoload=false`;
-      s.onload = () => kakao.maps.load(() => {
-        S.kakao = true; renderResults();
-        const mini = $('#miniMap');
-        if (mini && S.book) { const c = cafeById(S.book.cafeId); drawMap(mini, [{ c, p: price(c, 'NORMAL', 'HOURLY'), diff: 0 }], null, c.id, true); }
-      });
+      s.id = 'kakao-sdk';
+      s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&libraries=services&autoload=false`;
+      s.onerror = () => finish('error');
+      s.onload = () => {
+        if (!window.kakao?.maps?.load) { finish('error'); return; }
+        try { window.kakao.maps.load(() => finish('ready')); }
+        catch { finish('error'); }
+      };
       document.head.appendChild(s);
     };
     if (window.KAKAO_JS_KEY) { load(window.KAKAO_JS_KEY); return; }
-    if (window.DEMO_ONLY) return;
-    fetch('/api/config').then((r) => (r.ok ? r.json() : {})).then((cfg) => { if (cfg.kakaoJsKey) load(cfg.kakaoJsKey); }).catch(() => { /* 서버가 없다 */ });
+    if (window.DEMO_ONLY) { finish('unconfigured'); return; }
+    fetch('/api/config').then((r) => (r.ok ? r.json() : {})).then((cfg) => {
+      if (settled) return;
+      if (cfg.kakaoJsKey) load(cfg.kakaoJsKey); else finish('unconfigured');
+    }).catch(() => finish('unconfigured'));
+  }
+
+  // ---- 카카오 장소 검색(Places API)으로 가져온 실제 스터디카페 ---------------------------------
+  // 이름·주소·전화번호·좌표·카카오맵 링크·가까운 역/대학은 카카오 정보다.
+  // 카카오는 요금·좌석 수·시설·사진·후기를 주지 않으므로 요금과 좌석 수는 예시 값(c.real 로 표시)이다.
+  const REAL_KEY = 'studymoa:real:v2';
+  function fromPlace(p, region) {
+    const id = Number(p.id), r = (k) => hash(`${id}|${k}`);
+    return {
+      id, real: true, name: p.place_name, sido: region.sido, sigungu: region.sigungu,
+      addr: p.road_address_name || p.address_name, lat: Number(p.y), lng: Number(p.x), phone: p.phone || '', url: p.place_url || '',
+      open: 0, close: 24, busy: 0.6 + r('b') * 0.4, roomCap: r('c') < 0.5 ? 4 : 6,
+      seats: { NORMAL: 30 + Math.floor(r('a') * 40), FOCUS: 8 + Math.floor(r('f') * 16), ROOM: 2 + Math.floor(r('r') * 3) },
+      fac: [], station: null, univ: null, reviews: [],
+      price: D.makePrice(Math.round((1700 + r('n') * 2300) / 100) * 100),
+    };
+  }
+  function applyReal(real) { // 실제 데이터가 있는 지역은 샘플 카페를 빼고 실제 카페로 교체한다
+    const regions = new Set(real.map((c) => `${c.sido}|${c.sigungu}`));
+    for (let i = D.cafes.length - 1; i >= 0; i--) {
+      const c = D.cafes[i];
+      if (!c.real && regions.has(`${c.sido}|${c.sigungu}`)) archived.push(...D.cafes.splice(i, 1));
+    }
+    real.forEach((c) => { if (!D.cafes.some((x) => x.id === c.id)) D.cafes.push(c); });
+    avgCache.clear();
+  }
+  function loadRealCache() {
+    try {
+      const o = JSON.parse(localStorage.getItem(REAL_KEY) || 'null');
+      if (o && Date.now() - o.t < 864e5 && o.cafes && o.cafes.length) { applyReal(o.cafes); S.realStatus = 'ready'; }
+    } catch { /* 저장된 데이터 없음 */ }
+  }
+  async function loadReal() {
+    const svc = window.kakao && kakao.maps && kakao.maps.services;
+    if (!svc) throw new Error('카카오 장소 검색 라이브러리를 불러오지 못했어요.');
+    S.realStatus = 'loading';
+    const ps = new svc.Places();
+    // 카카오 함수의 인자 순서는 (검색어 또는 분류 코드, 콜백, 옵션) 이다
+    const ask = (fn, first, opt) => new Promise((res) => fn.call(ps, first, (d, st) => res(st === svc.Status.OK ? d : []), opt));
+    const found = new Map(), stations = new Map(), univs = new Map();
+    await Promise.all(D.regions.map(async (reg) => {
+      const opt = (extra) => ({ location: new kakao.maps.LatLng(reg.center[0], reg.center[1]), radius: 4000, ...extra });
+      for (let page = 1; page <= 3; page++) {
+        const d = await ask(ps.keywordSearch, '스터디카페', opt({ sort: svc.SortBy.DISTANCE, page }));
+        d.forEach((p) => { if (/스터디카페/.test(p.category_name)) found.set(p.id, p); }); // 분류가 '스터디카페'인 곳만
+        if (d.length < 15) break;
+      }
+      for (let page = 1; page <= 2; page++) {
+        const d = await ask(ps.categorySearch, 'SW8', opt({ radius: 5000, page }));
+        d.forEach((p) => { const n = p.place_name.split(' ')[0]; stations.set(n, { name: n, lat: Number(p.y), lng: Number(p.x) }); });
+        if (d.length < 15) break;
+      }
+      const u = await ask(ps.keywordSearch, '대학교', opt({ radius: 5000 }));
+      u.forEach((p) => { if (/대학교/.test(p.category_name) && /대학교$/.test(p.place_name)) univs.set(p.place_name, { name: p.place_name, lat: Number(p.y), lng: Number(p.x) }); });
+    }));
+    const nearest = (c, map, maxKm) => {
+      let best = null, bd = Infinity;
+      map.forEach((s) => { const d = dist([c.lat, c.lng], [s.lat, s.lng]); if (d < bd) { bd = d; best = s; } });
+      return best && bd <= maxKm ? { name: best.name, km: bd } : null;
+    };
+    const list = [];
+    found.forEach((p) => {
+      const region = D.regions.find((r) => p.address_name.includes(r.sigungu));
+      if (!region) return;
+      const c = fromPlace(p, region);
+      const st = nearest(c, stations, 0.8), un = nearest(c, univs, 1.2);
+      if (st) c.station = `${st.name} 도보 ${Math.max(1, Math.round((st.km * 1000) / 70))}분`;
+      if (un) c.univ = `${un.name} 인근`;
+      list.push(c);
+    });
+    if (list.length) {
+      applyReal(list);
+      try { localStorage.setItem(REAL_KEY, JSON.stringify({ t: Date.now(), cafes: list })); } catch { /* 저장소 사용 불가 */ }
+    }
+    S.realStatus = list.length ? 'ready' : 'empty';
   }
 
   // =====================================================================================
@@ -484,18 +634,20 @@
         <div class="chips">${c.fac.map((f) => `<span class="chip">${ico(FACICO[f], 15)}${FAC[f]}</span>`).join('')}</div></div>
       <div class="gallery">${[0, 1, 2, 3, 4].map((i) => `<figure>${photo(c, i)}<figcaption>${PHOTO_LABEL[i]}</figcaption></figure>`).join('')}</div>
       <p class="photonote">시설 사진은 샘플 일러스트입니다.</p>
+      ${c.real ? `<p class="note" style="margin:12px 0 0">이 카페의 <b>이름·주소·전화번호·위치</b>는 카카오맵 정보이고, <b>요금·좌석 수·시설·사진은 예시</b>예요. 실제 정보는 ${c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">카카오맵에서 확인</a>` : '카카오맵에서 확인'}해 주세요.</p>` : ''}
       <div class="dlayout"><div class="dmain">
         <nav class="subnav" aria-label="상세 메뉴">${[['sec-price', '가격'], ['sec-seats', '좌석 현황'], ['sec-fac', '시설'], ['sec-loc', '위치·운영'], ['sec-rev', `후기 ${r.n}`]].map(([i, t]) => `<button data-act="nav" data-to="${i}">${t}</button>`).join('')}</nav>
-        <section class="dsec" id="sec-price"><h2>${ico('chart', 20)}가격 정보</h2>${priceTable(c)}</section>
+        <section class="dsec" id="sec-price"><h2>${ico('chart', 20)}가격 정보${c.real ? ' <small class="muted" style="font-size:13px;font-weight:400">(예시 요금)</small>' : ''}</h2>${priceTable(c)}</section>
         <section class="dsec" id="sec-seats"><h2>${ico('user', 20)}실시간 좌석 현황</h2><div id="seatbox"></div></section>
-        <section class="dsec" id="sec-fac"><h2>${ico('sofa', 20)}시설 안내</h2><div class="facgrid">${Object.entries(FAC).map(([k, t]) => `<div class="facitem${c.fac.includes(k) ? '' : ' off'}"><span class="ci">${ico(FACICO[k], 20)}</span>${t}${c.fac.includes(k) ? '' : ' (없음)'}</div>`).join('')}</div></section>
+        <section class="dsec" id="sec-fac"><h2>${ico('sofa', 20)}시설 안내</h2>${c.real ? '<p class="muted" style="margin:0">시설 정보는 카카오맵이 제공하지 않아 표시하지 않아요. 카카오맵 링크에서 확인해 주세요.</p>' : ''}<div class="facgrid"${c.real ? ' hidden' : ''}>${Object.entries(FAC).map(([k, t]) => `<div class="facitem${c.fac.includes(k) ? '' : ' off'}"><span class="ci">${ico(FACICO[k], 20)}</span>${t}${c.fac.includes(k) ? '' : ' (없음)'}</div>`).join('')}</div></section>
         <section class="dsec" id="sec-loc"><h2>${ico('pin', 20)}위치·운영 정보</h2><div class="locgrid">
           <ul class="infolist">
             <li>${ico('pin', 18)}<span>${esc(c.addr)}</span></li>
             ${c.station ? `<li>${ico('train', 18)}<span>${esc(c.station)}</span></li>` : ''}
             ${c.univ ? `<li>${ico('school', 18)}<span>${esc(c.univ)}</span></li>` : ''}
+            ${c.phone ? `<li>${ico('phone', 18)}<span>${esc(c.phone)}</span></li>` : ''}
             <li>${ico('clock', 18)}<span>${hoursText(c)}</span></li>
-            <li>${ico('user', 18)}<span>총 ${c.seats.NORMAL + c.seats.FOCUS + c.seats.ROOM}석 · 일반석 ${c.seats.NORMAL} · 집중석 ${c.seats.FOCUS} · 스터디룸 ${c.seats.ROOM}개(최대 ${c.roomCap}인)</span></li>
+            <li>${ico('user', 18)}<span>${c.real ? '(예시) ' : ''}총 ${c.seats.NORMAL + c.seats.FOCUS + c.seats.ROOM}석 · 일반석 ${c.seats.NORMAL} · 집중석 ${c.seats.FOCUS} · 스터디룸 ${c.seats.ROOM}개(최대 ${c.roomCap}인)</span></li>
             <li>${ico('target', 18)}<span>${esc(regionOf().label)}에서 ${km(dist(regionOf().center, [c.lat, c.lng]))}</span></li>
           </ul><div class="mini mapbox" id="miniMap" style="position:relative;top:0;height:220px;min-height:0"></div></div></section>
         <section class="dsec" id="sec-rev"><h2>${ico('book', 20)}이용 후기</h2>${reviewBlock(c)}</section>
@@ -742,7 +894,8 @@
   // 이벤트
   // =====================================================================================
   const resetSearch = () => { const keep = S.q.view; S.q = freshQuery(); S.q.view = keep; };
-  const afterQuery = () => { refreshPanel(); renderResults(); };
+  const afterQuery = () => { if (realMode()) S.q.fac = []; S.limit = 12; refreshPanel(); refreshCats(); renderResults(); };
+  const onRealLoaded = () => { if (realMode()) S.q.fac = []; refreshPanel(); refreshCats(); refreshMaps(); };
   const ACT = {
     home: (t, e) => { e.preventDefault(); location.hash = 'home'; if (!$('#panel')) return; window.scrollTo(0, 0); },
     goto: (t) => { const h = t.dataset.hash; if (location.hash === '#' + h) route(); else location.hash = h; },
@@ -779,7 +932,9 @@
     reset: () => { resetSearch(); document.querySelectorAll('.cat').forEach((b) => b.setAttribute('aria-pressed', 'false')); afterQuery(); },
     // ③ 비교·추천
     region: (t) => { S.q.sido = t.dataset.s; S.q.sigungu = t.dataset.g; S.q.geo = null; afterQuery(); },
-    sort: (t) => { S.q.sort = t.dataset.v; renderResults(); },
+    sort: (t) => { S.q.sort = t.dataset.v; S.limit = 12; renderResults(); },
+    more: () => { S.limit += 12; renderResults(); },
+    retryMap: () => { initKakao(); refreshMaps(); },
     view: (t) => { S.q.view = t.dataset.v; renderResults(); },
     pin: (t) => {
       S.hl = Number(t.dataset.id); renderResults();
@@ -859,6 +1014,7 @@
     $('#logoMark2').innerHTML = ico('book', 20);
     await seedDemo();
     renderUser();
+    loadRealCache(); // 이전에 불러온 실제 카페가 있으면 처음부터 실제 이름으로 보여준다
     initKakao();
     route();
   }
