@@ -89,7 +89,8 @@
     seat: 'ANY', people: 1, fac: [], sido: '서울특별시', sigungu: '강남구', radius: 0, geo: null,
     nearStation: false, nearUniv: false, sort: 'price', view: 'map',
   });
-  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, me: null, locating: false, kakao: false, mapStatus: 'loading', regionDone: new Set(), inflight: new Map(), regionLoading: null, regionError: null, limit: 12, adv: false, facMore: false };
+  const PAGE = Infinity; // 목록은 나누지 않고 선택한 지역의 카페를 전부 보여준다
+  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, me: null, locating: false, kakao: false, mapStatus: 'loading', regionDone: new Set(), inflight: new Map(), regionLoading: null, regionError: null, limit: Infinity, adv: false, facMore: false };
   // 실제 데이터로 교체되면서 빠진 샘플 카페도 찾을 수 있게 보관한다 (예약 내역 표시용)
   const archived = [];
   const cafeById = (id) => D.cafes.find((c) => c.id === Number(id)) || archived.find((c) => c.id === Number(id));
@@ -363,7 +364,7 @@
     const v = qView(), q = S.q;
     // 내 위치 모드에서 반경 안에 카페가 없으면 가장 가까운 카페를 대신 보여준다
     const nearestOnly = q.geo && !list.length;
-    if (nearestOnly) list = results(true).sort((a, b) => a.d - b.d).slice(0, 6);
+    if (nearestOnly) list = results(true).sort((a, b) => a.d - b.d); // 반경 안이 비면 6곳으로 자르지 않고 불러온 카페 전체를 가까운 순으로 보여준다
     const where = q.geo ? '내 주변' : `${q.sido} ${q.sigungu}`;
     const when = v.mode === 'HOURLY' ? `${fmtDate(v.date)} ${hh(v.start)}–${hh(v.end)}` : `${PLAN[v.plan]}`;
     const sorts = [['price', '최저가순'], ['distance', '거리순'], ['rating', '평점순'], ['diff', '평균 대비 저렴순']];
@@ -379,7 +380,7 @@
     const why = { denied: '위치 권한이 꺼져 있어', unavailable: '현재 위치를 확인하지 못해', abroad: '내 위치 주변에서 지역 정보를 찾지 못해', unsupported: '이 브라우저에서는 위치 기능을 쓸 수 없어' }[S.locFail];
     const locNote = !S.me && why ? `<div class="locnote"><span>${why} <b>${esc(q.sido)} ${esc(q.sigungu)}</b> 기준으로 보여드려요.</span><span class="locbtns">${['denied', 'unavailable'].includes(S.locFail) ? '<button class="btn sm" data-act="locHelp">위치 허용 방법</button>' : ''}${S.locFail !== 'unsupported' ? '<button class="btn sm" data-act="locRetry">다시 시도</button>' : ''}<button class="btn sm" data-act="goArea">지역 직접 선택</button></span></div>` : '';
     const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.quick.map(([sd, sg]) => `<button class="chip" data-act="region" data-s="${esc(sd)}" data-g="${esc(sg)}" aria-pressed="${!q.geo && q.sido === sd && q.sigungu === sg}">${esc(sg)}</button>`).join('')}</div>`;
-    const nearNotice = nearestOnly && list.length ? `<div class="note" style="margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span>내 위치 반경 ${q.radius || 5}km 안에는 샘플 카페가 없어요. 가장 가까운 ${list.length}곳을 보여드려요. (가장 가까운 곳: ${km(list[0].d)})</span><button class="btn sm" data-act="geo">내 위치 해제</button></div>` : ``;
+    const nearNotice = nearestOnly && list.length ? `<div class="note" style="margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span>내 위치 반경 ${q.radius || 5}km 안에는 카페가 없어요. 반경 밖의 카페 ${list.length}곳을 가까운 순으로 모두 보여드려요. (가장 가까운 곳: ${km(list[0].d)})</span><button class="btn sm" data-act="geo">내 위치 해제</button></div>` : ``;
     box.innerHTML = `${locNote}${realNote}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
       <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}</small></div>
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
@@ -644,7 +645,7 @@
       const pt = [p.coords.latitude, p.coords.longitude];
       const near = D.regions.map((r) => ({ r, d: dist(pt, r.center) })).sort((a, b) => a.d - b.d)[0];
       if (!near || near.d > 40) { S.locFail = 'abroad'; resolve(false); return; }
-      S.locFail = null; S.me = pt; S.q.geo = pt; if (!S.q.radius) S.q.radius = 5;
+      S.locFail = null; S.me = pt;
       S.q.sido = near.r.sido; S.q.sigungu = near.r.sigungu; // 지역 선택도 지금 있는 곳으로 맞춘다
       resolve(true);
     }, (err) => {
@@ -658,8 +659,8 @@
     if (S.locating) return Promise.resolve(false);
     return locate().then((ok) => {
       if (!ok) { renderResults(); return false; }
-      refreshPanel(); refreshCats(); renderResults();
-      ensureNear(S.me, S.q.radius || 5).finally(() => onRealLoaded());
+      refreshPanel(); refreshCats();
+      const pr = ensureRegion(regionOf()); renderResults(); pr.finally(() => onRealLoaded()); // 지금 있는 시·군·구의 카페 전체를 불러온다
       if (announce) toast(`현재 위치를 반영했어요: ${S.q.sido} ${S.q.sigungu}`);
       return true;
     });
@@ -978,7 +979,7 @@
   // 이벤트
   // =====================================================================================
   const resetSearch = () => { const keep = S.q.view; S.q = freshQuery(); S.q.view = keep; };
-  const afterQuery = () => { if (realMode()) S.q.fac = []; S.limit = 12; refreshPanel(); refreshCats(); renderResults(); };
+  const afterQuery = () => { if (realMode()) S.q.fac = []; S.limit = PAGE; refreshPanel(); refreshCats(); renderResults(); };
   const onRealLoaded = () => { if (realMode()) S.q.fac = []; refreshPanel(); refreshCats(); refreshMaps(); };
   const ACT = {
     home: (t, e) => { e.preventDefault(); location.hash = 'home'; if (!$('#panel')) return; window.scrollTo(0, 0); },
@@ -1019,9 +1020,10 @@
     // '내 주변' 모드를 켜고 끈다. 끄면 고른 지역만 보여주되, 거리는 계속 현재 위치에서 잰다.
     geo: () => {
       if (S.q.geo) { S.q.geo = null; afterQuery(); return; }
-      if (S.me) { S.q.geo = S.me; if (!S.q.radius) S.q.radius = 5; afterQuery(); ensureNear(S.me, S.q.radius).finally(() => onRealLoaded()); return; }
+      const on = () => { S.q.geo = S.me; if (!S.q.radius) S.q.radius = 5; afterQuery(); ensureNear(S.me, S.q.radius).finally(() => onRealLoaded()); };
+      if (S.me) { on(); return; }
       toast('위치를 확인하는 중이에요…');
-      applyLocation();
+      applyLocation().then((ok) => { if (ok) on(); });
     },
     cat: (t) => {
       const { kind, v } = t.dataset;
@@ -1037,7 +1039,7 @@
       S.q.sido = t.dataset.s; S.q.sigungu = t.dataset.g; S.q.geo = null; rememberRegion(); afterQuery();
       const pr = ensureRegion(regionOf()); renderResults(); pr.finally(() => onRealLoaded()); // 고른 구를 불러온다
     },
-    sort: (t) => { S.q.sort = t.dataset.v; S.limit = 12; renderResults(); },
+    sort: (t) => { S.q.sort = t.dataset.v; S.limit = PAGE; renderResults(); },
     more: () => { S.limit += 12; renderResults(); },
     retryMap: () => { initKakao(); refreshMaps(); },
     view: (t) => { S.q.view = t.dataset.v; renderResults(); },
@@ -1096,7 +1098,7 @@
       else if (k === 'end') q.end = Number(t.value);
       else if (k === 'plan') q.plan = t.value;
       if (['sido', 'sigungu', 'start', 'radius'].includes(k)) refreshPanel(); else if (k === 'date') { const p = $('#panel .panel-foot .muted'); if (p) refreshPanel(); }
-      S.limit = 12;
+      S.limit = PAGE;
       renderResults();
       if (k === 'sido' || k === 'sigungu') { rememberRegion(); const pr = ensureRegion(regionOf()); renderResults(); pr.finally(() => onRealLoaded()); } // 고른 구를 불러온다
       else if (k === 'radius' && q.geo) ensureNear(q.geo, q.radius || 5).finally(() => onRealLoaded());
