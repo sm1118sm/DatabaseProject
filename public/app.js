@@ -530,7 +530,12 @@
   function restoreRegion() { // 위치를 못 받았을 때를 위해, 마지막에 직접 고른 지역으로 시작한다
     try { const m = JSON.parse(localStorage.getItem(REGION_MEMO) || 'null'); if (m && D.regions.some((r) => r.sido === m[0] && r.sigungu === m[1])) { S.q.sido = m[0]; S.q.sigungu = m[1]; } } catch { /* 저장된 지역 없음 */ }
   }
-  const regCacheKey = (r) => `studymoa:r:v2:${regKey(r)}`; // 매칭 규칙을 고칠 때마다 버전을 올려 이전 결과를 버린다
+  const regCacheKey = (r) => `studymoa:r:v4:${regKey(r)}`; // 매칭 규칙을 고칠 때마다 버전을 올려 이전 결과를 버린다
+  // 카카오는 '스터디카페,스터디룸' 한 분류에 스터디카페·스터디룸·독서실·공유오피스·모임공간을 함께 넣는다.
+  // 스터디카페가 확실한 곳만 남긴다: 이름에 스터디카페가 들어가거나, 카카오가 프랜차이즈 브랜드(카공족·초심 등)로 따로 분류한 곳.
+  const CAFE_NAME = /스터디\s*카페|스터디앤카페|카페N스터디/;
+  const NOT_CAFE = /독서실|공유\s*오피스|공유\s*공간|모임\s*공간|학원|스튜디오/;
+  const isStudyCafe = (p) => !NOT_CAFE.test(p.place_name) && (CAFE_NAME.test(p.place_name) || /스터디카페,스터디룸\s*>\s*\S/.test(p.category_name)) && (CAFE_NAME.test(p.place_name) || !/스터디룸/.test(p.place_name));
   // 카카오 주소(예: '서울 강남구 역삼동', '충남 천안시 서북구 ...')가 이 시·군·구에 속하는지
   // 시·도는 전체 이름('세종특별자치시', '강원특별자치도')이나 줄임말('충북', '경기') 어느 쪽으로 시작해도 인정한다. 세종은 시·군·구가 없다.
   const addrOk = (addr, r) => [r.sido, ...(D.ALIAS[r.sido] || [])].some((a) => addr.startsWith(a)) && (r.sigungu === r.sido || new RegExp(`(^| )${r.sigungu}( |$)`).test(addr));
@@ -579,7 +584,7 @@
       let capped = false;
       for (let page = 1; page <= 3; page++) {
         const d = await ask(ps.keywordSearch, '스터디카페', { rect: rectOf(x0, y0, x1, y1), page });
-        d.forEach((p) => { if (/스터디카페/.test(p.category_name) && addrOk(p.address_name, reg)) found.set(p.id, p); }); // 분류가 '스터디카페'이고 이 구에 속한 곳만
+        d.forEach((p) => { if (/스터디카페/.test(p.category_name) && isStudyCafe(p) && addrOk(p.address_name, reg)) found.set(p.id, p); }); // 스터디카페가 확실하고 이 구에 속한 곳만
         if (d.length < 15) break;
         if (page === 3) capped = true;
       }
@@ -1132,7 +1137,7 @@
     await seedDemo();
     renderUser();
     const ra = $('#regAsof'); if (ra) ra.textContent = window.SC_REGIONS_ASOF || '';
-    try { Object.keys(localStorage).filter((k) => /^studymoa:r:v1:|^studymoa:real:/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch { /* 저장소 사용 불가 */ } // 쓰지 않는 옛 저장본 정리
+    try { Object.keys(localStorage).filter((k) => /^studymoa:r:v[123]:|^studymoa:real:/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch { /* 저장소 사용 불가 */ } // 쓰지 않는 옛 저장본 정리
     restoreRegion();
     ensureRegion(regionOf()); // 이전에 불러온 실제 카페가 저장돼 있으면 처음부터 실제 이름으로 보여준다
     // 웹사이트를 켤 때마다 현재 위치를 받아 내 주변 기준으로 바꾼다 (거부하면 선택한 지역 기준)
