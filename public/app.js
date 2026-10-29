@@ -113,7 +113,7 @@
     seat: 'ANY', people: 1, fac: [], sido: '서울특별시', sigungu: '강남구', radius: 0, geo: null,
     nearStation: false, nearUniv: false, sort: 'price', view: 'map',
   });
-  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, kakao: false, mapStatus: 'loading', realStatus: 'none', limit: 12, adv: false, facMore: false };
+  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, kakao: false, mapStatus: 'loading', regionDone: new Set(), inflight: new Map(), regionLoading: null, regionError: null, limit: 12, adv: false, facMore: false };
   // 실제 데이터로 교체되면서 빠진 샘플 카페도 찾을 수 있게 보관한다 (예약 내역 표시용)
   const archived = [];
   const cafeById = (id) => D.cafes.find((c) => c.id === Number(id)) || archived.find((c) => c.id === Number(id));
@@ -235,7 +235,7 @@
     const q = S.q, v = qView();
     const sidos = [...new Set(D.regions.map((r) => r.sido))];
     const sigs = D.regions.filter((r) => r.sido === q.sido);
-    const base = q.geo ? '현재 위치' : `${regionOf().label} (${q.sigungu} 중심)`;
+    const base = q.geo ? '현재 위치' : (/중심$/.test(regionOf().label) ? regionOf().label : `${regionOf().label} (${q.sigungu} 중심)`);
     // 시설 옵션은 앞의 4개만 보여주고 나머지는 '+ 더보기'로 펼친다 (이미 선택한 칩은 항상 보인다)
     const facAll = Object.entries(FAC);
     const facShown = S.facMore ? facAll : facAll.filter(([k], i) => i < 4 || q.fac.includes(k));
@@ -406,18 +406,23 @@
     const where = q.geo ? '내 주변' : `${q.sido} ${q.sigungu}`;
     const when = v.mode === 'HOURLY' ? `${fmtDate(v.date)} ${hh(v.start)}–${hh(v.end)}` : `${PLAN[v.plan]}`;
     const sorts = [['price', '최저가순'], ['distance', '거리순'], ['rating', '평점순'], ['diff', '평균 대비 저렴순']];
-    const empty = `<li class="empty"><h3>조건에 맞는 스터디카페가 없어요</h3><p class="muted">${q.geo ? '내 주변에 샘플 카페가 없을 수 있어요. 지역을 직접 선택해 보세요.' : '시간이나 시설 조건을 줄여서 다시 찾아보세요.'}</p><button class="btn primary" data-act="reset">조건 초기화</button></li>`;
+    const loading = !!S.regionLoading, noKakao = !S.kakao && !D.cafes.some((c) => c.sido === q.sido && c.sigungu === q.sigungu);
+    const empty = loading ? `<li class="empty"><h3>카카오맵에서 ${esc(q.sigungu)} 스터디카페를 불러오는 중이에요</h3><p class="muted">처음 보는 지역은 몇 초 걸려요. 한 번 불러온 지역은 다음부터 바로 보여요.</p></li>`
+      : noKakao ? `<li class="empty"><h3>이 지역은 카카오맵 연결이 필요해요</h3><p class="muted">지도를 불러오지 못해 실제 카페 정보를 가져올 수 없어요. 잠시 뒤 다시 시도해 주세요.</p></li>`
+      : `<li class="empty"><h3>조건에 맞는 스터디카페가 없어요</h3><p class="muted">${q.geo ? '내 주변에 카페가 없을 수 있어요. 지역을 직접 선택해 보세요.' : S.regionError === `${q.sido}|${q.sigungu}` ? '카카오맵에서 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.' : '이 지역에는 카카오맵에 등록된 스터디카페가 없거나, 조건에 맞는 곳이 없어요.'}</p><button class="btn primary" data-act="reset">조건 초기화</button></li>`;
+    const hlIdx = list.findIndex((it) => it.c.id === S.hl);
+    if (hlIdx >= S.limit) S.limit = hlIdx + 1; // 지도에서 고른 카페가 목록에 보이도록 목록을 그 위치까지 펼친다
     const shown = list.slice(0, S.limit);
-    const realNote = S.realStatus === 'loading' ? '<p class="note" style="margin-bottom:12px">카카오맵에서 실제 스터디카페를 불러오는 중이에요…</p>'
-      : S.realStatus === 'ready' ? '<p class="note" style="margin-bottom:12px">카페 이름·주소·위치는 카카오맵 정보이고, <b>요금과 좌석 수는 예시</b>예요. 카페를 누르면 카카오맵 링크가 있어요.</p>' : '';
-    const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.regions.map((r) => `<button class="chip" data-act="region" data-s="${esc(r.sido)}" data-g="${esc(r.sigungu)}" aria-pressed="${!q.geo && q.sigungu === r.sigungu}">${esc(r.sigungu)}</button>`).join('')}</div>`;
+    const realNote = S.regionLoading ? `<p class="note" style="margin-bottom:12px">카카오맵에서 ${esc(q.sigungu)} 스터디카페를 불러오는 중이에요…</p>`
+      : realMode() ? '<p class="note" style="margin-bottom:12px">카페 이름·주소·위치는 카카오맵 정보이고, <b>요금과 좌석 수는 예시</b>예요. 카페를 누르면 카카오맵 링크가 있어요.</p>' : '';
+    const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.quick.map(([sd, sg]) => `<button class="chip" data-act="region" data-s="${esc(sd)}" data-g="${esc(sg)}" aria-pressed="${!q.geo && q.sido === sd && q.sigungu === sg}">${esc(sg)}</button>`).join('')}</div>`;
     const nearNotice = nearestOnly && list.length ? `<div class="note" style="margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span>내 위치 반경 ${q.radius || 5}km 안에는 샘플 카페가 없어요. 가장 가까운 ${list.length}곳을 보여드려요. (가장 가까운 곳: ${km(list[0].d)})</span><button class="btn sm" data-act="geo">내 위치 해제</button></div>` : ``;
     box.innerHTML = `${realNote}${regionChips}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
       <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}</small></div>
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
           <button class="tab map-toggle" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} ${q.view === 'map' ? '목록만 보기' : '지도로 보기'}</button></div></div>
       <div class="reslayout${q.view === 'map' ? ' withmap' : ''}"><div><ul class="grid">${list.length ? shown.map((it, i) => cardHtml(it, i)).join('') : empty}</ul>${list.length > shown.length ? `<div style="text-align:center;margin-top:18px"><button class="btn" data-act="more">더 보기 (${shown.length}/${list.length})</button></div>` : ''}</div>${q.view === 'map' ? '<div class="mapbox" id="mapbox"></div>' : ''}</div>`;
-    if (q.view === 'map') drawMap($('#mapbox'), shown, origin(), S.hl);
+    if (q.view === 'map') drawMap($('#mapbox'), list, origin(), S.hl); // 지도에는 조건에 맞는 카페를 모두 표시한다
   }
 
   function mapNotice(el, message, retry = false) {
@@ -456,15 +461,18 @@
             <a class="maplink" href="https://map.kakao.com/link/map/${encodeURIComponent(c.name)},${c.lat},${c.lng}" target="_blank" rel="noopener">카카오맵에서 크게 보기 ↗</a>`);
           return;
         }
-        const ctr = org || [items[0].c.lat, items[0].c.lng];
+        // 카페가 한 곳이면 그 카페를 가운데에 둔다 (넓은 군에서는 기준 위치가 화면 밖일 수 있다)
+        const ctr = items.length === 1 ? [items[0].c.lat, items[0].c.lng] : (org || [items[0].c.lat, items[0].c.lng]);
         const map = new kakao.maps.Map($('.kmap', el), { center: new kakao.maps.LatLng(ctr[0], ctr[1]), level: 5 });
         const bounds = new kakao.maps.LatLngBounds();
-        items.forEach(({ c, p, diff }) => { // 가격이 적힌 말풍선 마커
+        const many = items.length > 30; // 카페가 많으면 작은 점으로 찍고, 고른 카페만 가격 말풍선으로 보여준다
+        items.forEach(({ c, p, diff }) => {
           const pos = new kakao.maps.LatLng(c.lat, c.lng), b = document.createElement('button');
-          b.className = 'kpin'; b.setAttribute('aria-label', c.name);
-          b.innerHTML = `<span class="bubble ${diff < 0 ? 'low' : diff > 0 ? 'high' : ''}">${p.toLocaleString('ko-KR')}</span>`;
+          const bubble = !many || hlId === c.id, tone = diff < 0 ? 'low' : diff > 0 ? 'high' : '';
+          b.className = bubble ? 'kpin' : 'kdot'; b.setAttribute('aria-label', c.name); b.title = c.name;
+          b.innerHTML = bubble ? `<span class="bubble ${tone}">${p.toLocaleString('ko-KR')}</span>` : `<span class="dotm ${tone}"></span>`;
           b.onclick = () => { if (items.length > 1) { S.hl = c.id; renderResults(); } else location.hash = 'cafe-' + c.id; };
-          new kakao.maps.CustomOverlay({ map, position: pos, content: b, xAnchor: 0.5, yAnchor: 1 });
+          new kakao.maps.CustomOverlay({ map, position: pos, content: b, xAnchor: 0.5, yAnchor: bubble ? 1 : 0.5, zIndex: hlId === c.id ? 10 : 1 });
           bounds.extend(pos);
         });
         if (org) {
@@ -486,7 +494,9 @@
     const rLa = Math.max(Math.max(...lats) - minLa, 0.012), rLn = Math.max(Math.max(...lngs) - minLn, 0.012);
     const pos = (la, ln) => `left:${8 + 84 * ((ln - minLn) / rLn)}%;top:${16 + 70 * (1 - (la - minLa) / rLa)}%`;
     el.innerHTML = `<div class="fakemap"></div>
-      ${items.map(({ c, p, diff }) => `<button class="pin${hlId === c.id ? ' on' : ''}" style="${pos(c.lat, c.lng)}" data-act="pin" data-id="${c.id}" aria-label="${esc(c.name)}"><span class="bubble ${diff < 0 ? 'low' : diff > 0 ? 'high' : ''}">${p.toLocaleString('ko-KR')}</span></button>`).join('')}
+      ${items.map(({ c, p, diff }) => { const tone = diff < 0 ? 'low' : diff > 0 ? 'high' : ''; return items.length > 30 && hlId !== c.id
+        ? `<button class="pindot" style="${pos(c.lat, c.lng)}" data-act="pin" data-id="${c.id}" aria-label="${esc(c.name)}" title="${esc(c.name)}"><span class="dotm ${tone}"></span></button>`
+        : `<button class="pin${hlId === c.id ? ' on' : ''}" style="${pos(c.lat, c.lng)}" data-act="pin" data-id="${c.id}" aria-label="${esc(c.name)}"><span class="bubble ${tone}">${p.toLocaleString('ko-KR')}</span></button>`; }).join('')}
       ${org ? `<span class="origin" style="${pos(org[0], org[1])}" title="기준 위치"></span>` : ''}
       <span class="maplabel">간이 위치도${org ? ' · 파란 점은 기준 위치' : ''}</span>`;
     if (items.length === 1) {
@@ -512,7 +522,7 @@
       S.mapStatus = status;
       S.kakao = status === 'ready';
       // 지도가 준비되면 카카오 장소 검색으로 실제 스터디카페를 불러온 뒤 화면을 갱신한다
-      if (S.kakao) loadReal().catch(() => { S.realStatus = 'error'; }).finally(() => onRealLoaded());
+      if (S.kakao) { S.regionLoading = regKey(regionOf()); refreshMaps(); ensureRegion(regionOf()).finally(() => onRealLoaded()); }
       else refreshMaps();
     };
     timer = setTimeout(() => finish('error'), 12000);
@@ -540,7 +550,11 @@
   // ---- 카카오 장소 검색(Places API)으로 가져온 실제 스터디카페 ---------------------------------
   // 이름·주소·전화번호·좌표·카카오맵 링크·가까운 역/대학은 카카오 정보다.
   // 카카오는 요금·좌석 수·시설·사진·후기를 주지 않으므로 요금과 좌석 수는 예시 값(c.real 로 표시)이다.
-  const REAL_KEY = 'studymoa:real:v2';
+  // 전국 시·군·구를 한꺼번에 가져오면 호출이 너무 많아서, 사용자가 고른 시·군·구만 그때 검색하고 24시간 저장한다.
+  const regKey = (r) => `${r.sido}|${r.sigungu}`;
+  const regCacheKey = (r) => `studymoa:r:v1:${regKey(r)}`;
+  // 카카오 주소(예: '서울 강남구 역삼동', '충남 천안시 서북구 ...')가 이 시·군·구에 속하는지
+  const addrOk = (addr, r) => (D.ALIAS[r.sido] || []).some((a) => addr.startsWith(a)) && new RegExp(`(^| )${r.sigungu}( |$)`).test(addr);
   function fromPlace(p, region) {
     const id = Number(p.id), r = (k) => hash(`${id}|${k}`);
     return {
@@ -552,44 +566,67 @@
       price: D.makePrice(Math.round((1700 + r('n') * 2300) / 100) * 100),
     };
   }
-  function applyReal(real) { // 실제 데이터가 있는 지역은 샘플 카페를 빼고 실제 카페로 교체한다
-    const regions = new Set(real.map((c) => `${c.sido}|${c.sigungu}`));
+  function applyRegion(reg, real) { // 이 지역의 샘플 카페는 빼서 보관하고, 실제 카페를 넣는다
     for (let i = D.cafes.length - 1; i >= 0; i--) {
       const c = D.cafes[i];
-      if (!c.real && regions.has(`${c.sido}|${c.sigungu}`)) archived.push(...D.cafes.splice(i, 1));
+      if (!c.real && c.sido === reg.sido && c.sigungu === reg.sigungu) archived.push(...D.cafes.splice(i, 1));
     }
     real.forEach((c) => { if (!D.cafes.some((x) => x.id === c.id)) D.cafes.push(c); });
+    // 경계 상자의 한가운데는 산이나 바다일 수 있어서, 대표 역이 정해지지 않은 지역은 카페가 모인 곳의 중심을 거리 기준으로 쓴다
+    if (real.length && /중심$/.test(reg.label)) {
+      reg.center = [real.reduce((s, c) => s + c.lat, 0) / real.length, real.reduce((s, c) => s + c.lng, 0) / real.length];
+      reg.label = `${reg.sigungu} 카페 중심`;
+    }
     avgCache.clear();
   }
-  function loadRealCache() {
+  function readRegionCache(reg) {
     try {
-      const o = JSON.parse(localStorage.getItem(REAL_KEY) || 'null');
-      if (o && Date.now() - o.t < 864e5 && o.cafes && o.cafes.length) { applyReal(o.cafes); S.realStatus = 'ready'; }
+      const o = JSON.parse(localStorage.getItem(regCacheKey(reg)) || 'null');
+      if (o && Date.now() - o.t < 864e5 && Array.isArray(o.cafes)) return o.cafes;
     } catch { /* 저장된 데이터 없음 */ }
+    return null;
   }
-  async function loadReal() {
+  async function scanRegion(reg) {
     const svc = window.kakao && kakao.maps && kakao.maps.services;
     if (!svc) throw new Error('카카오 장소 검색 라이브러리를 불러오지 못했어요.');
-    S.realStatus = 'loading';
     const ps = new svc.Places();
     // 카카오 함수의 인자 순서는 (검색어 또는 분류 코드, 콜백, 옵션) 이다
     const ask = (fn, first, opt) => new Promise((res) => fn.call(ps, first, (d, st) => res(st === svc.Status.OK ? d : []), opt));
     const found = new Map(), stations = new Map(), univs = new Map();
-    await Promise.all(D.regions.map(async (reg) => {
-      const opt = (extra) => ({ location: new kakao.maps.LatLng(reg.center[0], reg.center[1]), radius: 4000, ...extra });
+    // 시·군·구 전체를 빠짐없이 가져오려고 경계 상자를 격자로 나눠 검색한다. (한 번에 최대 45건만 주기 때문)
+    // 한 칸의 결과가 45건을 넘으면 그 칸을 4등분해서 다시 검색한다.
+    const rectOf = (x0, y0, x1, y1) => [x0, y0, x1, y1].map((v) => v.toFixed(6)).join(',');
+    const scanCell = async (x0, y0, x1, y1, depth) => {
+      let capped = false;
       for (let page = 1; page <= 3; page++) {
-        const d = await ask(ps.keywordSearch, '스터디카페', opt({ sort: svc.SortBy.DISTANCE, page }));
-        d.forEach((p) => { if (/스터디카페/.test(p.category_name)) found.set(p.id, p); }); // 분류가 '스터디카페'인 곳만
+        const d = await ask(ps.keywordSearch, '스터디카페', { rect: rectOf(x0, y0, x1, y1), page });
+        d.forEach((p) => { if (/스터디카페/.test(p.category_name) && addrOk(p.address_name, reg)) found.set(p.id, p); }); // 분류가 '스터디카페'이고 이 구에 속한 곳만
         if (d.length < 15) break;
+        if (page === 3) capped = true;
       }
-      for (let page = 1; page <= 2; page++) {
-        const d = await ask(ps.categorySearch, 'SW8', opt({ radius: 5000, page }));
+      if (capped && depth < 3) {
+        const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+        await Promise.all([[x0, y0, mx, my], [mx, y0, x1, my], [x0, my, mx, y1], [mx, my, x1, y1]].map((c) => scanCell(...c, depth + 1)));
+      }
+    };
+    const [x0, y0, x1, y1] = reg.box;
+    const nx = Math.min(8, Math.max(1, Math.ceil(((x1 - x0) * 88) / 2.5))), ny = Math.min(8, Math.max(1, Math.ceil(((y1 - y0) * 111) / 2.5)));
+    const dx = (x1 - x0) / nx, dy = (y1 - y0) / ny, cells = [];
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) cells.push([x0 + i * dx, y0 + j * dy, x0 + (i + 1) * dx, y0 + (j + 1) * dy]);
+    for (let k = 0; k < cells.length; k += 4) await Promise.all(cells.slice(k, k + 4).map((c) => scanCell(...c, 0))); // 한 번에 4칸씩
+    const rect = rectOf(x0 - 0.01, y0 - 0.01, x1 + 0.01, y1 + 0.01);
+    if (found.size) { // 카페가 있는 구에서만 가까운 역·대학교를 찾는다
+      for (let page = 1; page <= 3; page++) {
+        const d = await ask(ps.categorySearch, 'SW8', { rect, page });
         d.forEach((p) => { const n = p.place_name.split(' ')[0]; stations.set(n, { name: n, lat: Number(p.y), lng: Number(p.x) }); });
         if (d.length < 15) break;
       }
-      const u = await ask(ps.keywordSearch, '대학교', opt({ radius: 5000 }));
-      u.forEach((p) => { if (/대학교/.test(p.category_name) && /대학교$/.test(p.place_name)) univs.set(p.place_name, { name: p.place_name, lat: Number(p.y), lng: Number(p.x) }); });
-    }));
+      for (let page = 1; page <= 2; page++) {
+        const u = await ask(ps.keywordSearch, '대학교', { rect, page });
+        u.forEach((p) => { if (/대학교/.test(p.category_name) && /대학교$/.test(p.place_name)) univs.set(p.place_name, { name: p.place_name, lat: Number(p.y), lng: Number(p.x) }); });
+        if (u.length < 15) break;
+      }
+    }
     const nearest = (c, map, maxKm) => {
       let best = null, bd = Infinity;
       map.forEach((s) => { const d = dist([c.lat, c.lng], [s.lat, s.lng]); if (d < bd) { bd = d; best = s; } });
@@ -597,19 +634,40 @@
     };
     const list = [];
     found.forEach((p) => {
-      const region = D.regions.find((r) => p.address_name.includes(r.sigungu));
-      if (!region) return;
-      const c = fromPlace(p, region);
+      const c = fromPlace(p, reg);
       const st = nearest(c, stations, 0.8), un = nearest(c, univs, 1.2);
       if (st) c.station = `${st.name} 도보 ${Math.max(1, Math.round((st.km * 1000) / 70))}분`;
       if (un) c.univ = `${un.name} 인근`;
       list.push(c);
     });
-    if (list.length) {
-      applyReal(list);
-      try { localStorage.setItem(REAL_KEY, JSON.stringify({ t: Date.now(), cafes: list })); } catch { /* 저장소 사용 불가 */ }
+    return list;
+  }
+  // 고른 시·군·구의 실제 카페를 불러온다. 이미 본 구는 저장된 결과를 쓴다. (같은 구를 동시에 두 번 검색하지 않는다)
+  function ensureRegion(reg) {
+    const key = regKey(reg);
+    if (S.regionDone.has(key)) return Promise.resolve();
+    const cached = readRegionCache(reg);
+    if (cached) { applyRegion(reg, cached); S.regionDone.add(key); return Promise.resolve(); }
+    if (!S.kakao) return Promise.resolve(); // 카카오 연결이 없으면 샘플 지역만 볼 수 있다
+    if (!S.inflight.has(key)) {
+      S.regionLoading = key;
+      S.inflight.set(key, scanRegion(reg).then((list) => {
+        applyRegion(reg, list);
+        try { localStorage.setItem(regCacheKey(reg), JSON.stringify({ t: Date.now(), cafes: list })); } catch { /* 저장소 사용 불가 */ }
+      }).catch(() => { S.regionError = key; }).finally(() => {
+        S.regionDone.add(key); S.inflight.delete(key);
+        if (S.regionLoading === key) S.regionLoading = null;
+      }));
     }
-    S.realStatus = list.length ? 'ready' : 'empty';
+    return S.inflight.get(key);
+  }
+  // 내 위치 모드: 내 위치 주변(반경 안)에 걸친 시·군·구를 모두 불러온다 (너무 많으면 가까운 5곳)
+  function ensureNear(pt, km) {
+    const near = D.regions.map((r) => {
+      const [x0, y0, x1, y1] = r.box, pad = km / 88;
+      return { r, d: dist(pt, r.center), hit: pt[1] >= x0 - pad && pt[1] <= x1 + pad && pt[0] >= y0 - km / 111 && pt[0] <= y1 + km / 111 };
+    }).filter((x) => x.hit).sort((a, b) => a.d - b.d).slice(0, 5);
+    return Promise.all(near.map((x) => ensureRegion(x.r)));
   }
 
   // =====================================================================================
@@ -941,7 +999,10 @@
       if (S.q.geo) { S.q.geo = null; afterQuery(); return; }
       if (!navigator.geolocation) { toast('이 브라우저에서는 위치 기능을 쓸 수 없어요.'); return; }
       toast('위치를 확인하는 중이에요…');
-      navigator.geolocation.getCurrentPosition((p) => { S.q.geo = [p.coords.latitude, p.coords.longitude]; if (!S.q.radius) S.q.radius = 5; afterQuery(); },
+      navigator.geolocation.getCurrentPosition((p) => {
+        S.q.geo = [p.coords.latitude, p.coords.longitude]; if (!S.q.radius) S.q.radius = 5; afterQuery();
+        ensureNear(S.q.geo, S.q.radius).finally(() => onRealLoaded()); // 내 위치 주변 시·군·구를 불러온다
+      },
         () => toast('위치를 가져올 수 없어요. 선택한 지역의 중심을 기준으로 찾을게요.'));
     },
     cat: (t) => {
@@ -954,7 +1015,10 @@
     search: () => { const el = $('#sec-compare'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
     reset: () => { resetSearch(); document.querySelectorAll('.cat').forEach((b) => b.setAttribute('aria-pressed', 'false')); afterQuery(); },
     // ③ 비교·추천
-    region: (t) => { S.q.sido = t.dataset.s; S.q.sigungu = t.dataset.g; S.q.geo = null; afterQuery(); },
+    region: (t) => {
+      S.q.sido = t.dataset.s; S.q.sigungu = t.dataset.g; S.q.geo = null; afterQuery();
+      const pr = ensureRegion(regionOf()); renderResults(); pr.finally(() => onRealLoaded()); // 고른 구를 불러온다
+    },
     sort: (t) => { S.q.sort = t.dataset.v; S.limit = 12; renderResults(); },
     more: () => { S.limit += 12; renderResults(); },
     retryMap: () => { initKakao(); refreshMaps(); },
@@ -1013,7 +1077,10 @@
       else if (k === 'start') { q.start = Number(t.value); if (q.end <= q.start) q.end = q.start + 1; }
       else if (k === 'end') q.end = Number(t.value);
       if (['sido', 'sigungu', 'start', 'radius'].includes(k)) refreshPanel(); else if (k === 'date') { const p = $('#panel .panel-foot .muted'); if (p) refreshPanel(); }
+      S.limit = 12;
       renderResults();
+      if (k === 'sido' || k === 'sigungu') { const pr = ensureRegion(regionOf()); renderResults(); pr.finally(() => onRealLoaded()); } // 고른 구를 불러온다
+      else if (k === 'radius' && q.geo) ensureNear(q.geo, q.radius || 5).finally(() => onRealLoaded());
     } else if (t.dataset.b) { // 예약 카드 입력
       const k = t.dataset.b, b = S.book, c = cafeById(b.cafeId);
       if (k === 'date') b.date = t.value || todayStr();
@@ -1038,7 +1105,7 @@
     $('#logoMark2').innerHTML = ico('book', 20);
     await seedDemo();
     renderUser();
-    loadRealCache(); // 이전에 불러온 실제 카페가 있으면 처음부터 실제 이름으로 보여준다
+    ensureRegion(regionOf()); // 이전에 불러온 실제 카페가 저장돼 있으면 처음부터 실제 이름으로 보여준다
     initKakao();
     route();
   }
