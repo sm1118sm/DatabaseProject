@@ -1,10 +1,10 @@
 // 사이트가 계산한 카페 정보(이름·주소·좌표·좌석 수·예시 가격)를 DB 에 넣는다.
-// 사용법: npm run db:import -- data/cafes-nationwide.jsonl [--dry-run]
+// 사용법: npm run db:import -- data/cafes-nationwide.jsonl [--dry-run]   (인터넷 DB: ENV_FILE=.env.hosted npm run db:import -- ...)
 // 한 줄이 시·군·구 하나이며 {sido, sigungu, cafes:[...]} 모양이다. 이미 있는 카페(kakao_place_id)는 건너뛴다.
 // 요금은 모두 price_source = 'EXAMPLE' 로 넣는다. 팀이 직접 확인한 요금만 나중에 VERIFIED(출처·확인일)로 바꾼다.
-require('dotenv').config();
 const fs = require('fs');
 const mysql = require('mysql2/promise');
+const { connectionOptions, dbName } = require('../server/dbconfig');
 
 const file = process.argv[2];
 const dry = process.argv.includes('--dry-run');
@@ -16,10 +16,7 @@ const seatLabel = (t, i) => (t === 'ROOM' ? `스터디룸 ${i}` : `${t === 'NORM
 const clip = (s, n) => String(s == null ? '' : s).slice(0, n);
 
 async function main() {
-  const conn = await mysql.createConnection({
-    host: process.env.DB_HOST || '127.0.0.1', port: Number(process.env.DB_PORT || 3306),
-    user: process.env.DB_USER || 'root', password: process.env.DB_PASSWORD || '', database: process.env.DB_NAME || 'studycafe',
-  });
+  const conn = await mysql.createConnection(connectionOptions({ database: dbName() }));
   const [regs] = await conn.query('SELECT region_id, sido, sigungu FROM region');
   const regionId = new Map(regs.map((r) => [`${r.sido}|${r.sigungu}`, r.region_id]));
   const [types] = await conn.query('SELECT seat_type_id, code FROM seat_type');
