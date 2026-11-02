@@ -357,6 +357,24 @@
       </div></li>`;
   }
 
+  // 지도에서 고른 카페를 목록 맨 위에 고정해서 보여준다 (카페가 많아도 어디인지 바로 알 수 있게)
+  function selHtml(list, v) {
+    const it = list.find((x) => x.c.id === S.hl);
+    if (!it) return '';
+    const { c, p, d, av } = it;
+    const meta = [`${esc(c.sigungu)} · ${km(d)}`, c.phone ? esc(c.phone) : ''].filter(Boolean).join(' · ');
+    const seats = av.free === 0 ? '만석' : `잔여 ${av.free}/${av.total}석`;
+    return `<div class="selcafe" id="selcafe" role="region" aria-label="지도에서 선택한 스터디카페">
+      <button class="selx" data-act="unsel" aria-label="선택 닫기">×</button>
+      <div class="selk">지도에서 선택한 스터디카페</div>
+      <div class="selname">${esc(c.name)}</div>
+      <div class="seladdr">${ico('pin', 14)}${esc(c.addr)}</div>
+      <div class="selmeta">${meta}</div>
+      <div class="selprice">${v.mode === 'HOURLY' ? '시간당' : PLAN[v.plan]}${c.real ? ' (예시)' : ''} <b>${won(p)}</b><span class="muted"> · ${seats}</span></div>
+      <div class="selbtns"><button class="btn primary sm" data-act="open" data-id="${c.id}">상세·예약</button>${c.url ? `<a class="btn sm" href="${esc(c.url)}" target="_blank" rel="noopener">카카오맵에서 보기 ↗</a>` : ''}</div>
+    </div>`;
+  }
+
   function renderResults() {
     const box = $('#results');
     if (!box) return;
@@ -387,7 +405,7 @@
       <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}${asof ? ` · ${asof}` : ''}</small></div>
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
           <button class="tab map-toggle" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} ${q.view === 'map' ? '목록만 보기' : '지도로 보기'}</button></div></div>
-      <div class="reslayout${q.view === 'map' ? ' withmap' : ''}"><div><ul class="grid">${list.length ? shown.map((it, i) => cardHtml(it, i)).join('') : empty}</ul>${list.length > shown.length ? `<div style="text-align:center;margin-top:18px"><button class="btn" data-act="more">더 보기 (${shown.length}/${list.length})</button></div>` : ''}</div>${q.view === 'map' ? '<div class="mapbox" id="mapbox"></div>' : ''}</div>`;
+      <div class="reslayout${q.view === 'map' ? ' withmap' : ''}"><div>${q.view === 'map' ? selHtml(list, v) : ''}<ul class="grid">${list.length ? shown.map((it, i) => cardHtml(it, i)).join('') : empty}</ul>${list.length > shown.length ? `<div style="text-align:center;margin-top:18px"><button class="btn" data-act="more">더 보기 (${shown.length}/${list.length})</button></div>` : ''}</div>${q.view === 'map' ? '<div class="mapbox" id="mapbox"></div>' : ''}</div>`;
     // 지도에는 조건에 맞는 카페를 모두 표시한다. 내 위치 점은 보고 있는 지역 가까이에 있을 때만 찍는다(멀면 지도가 너무 넓어진다).
     const mapOrg = q.geo || (S.me && dist(S.me, regionOf().center) < 15 ? S.me : null);
     if (q.view === 'map') drawMap($('#mapbox'), list, mapOrg, S.hl);
@@ -1053,6 +1071,7 @@
     more: () => { S.limit += 12; renderResults(); },
     retryMap: () => { initKakao(); refreshMaps(); },
     view: (t) => { S.q.view = t.dataset.v; renderResults(); },
+    unsel: () => { S.hl = null; renderResults(); },
     pin: (t) => {
       S.hl = Number(t.dataset.id); renderResults();
       const el = document.getElementById('card-' + S.hl); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });

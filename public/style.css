@@ -470,3 +470,15 @@ h1, h2, h3, .hero h1 { word-break: keep-all; }
 .footer h4, .footer .logo { color: var(--ink); }
 .footer button:hover { color: var(--ink); }
 .footer .legal { border-top-color: var(--line); color: var(--muted); }
+
+/* 지도에서 고른 카페: 목록 맨 위에 고정 */
+.selcafe { position: sticky; top: 92px; z-index: 6; background: var(--surface); border: 1px solid var(--gold); border-radius: var(--radius); padding: 16px 44px 16px 18px; margin-bottom: 16px; box-shadow: 0 6px 20px rgba(25, 31, 40, .08); }
+.selcafe .selk { font-size: 12px; font-weight: 700; color: var(--gold); margin-bottom: 4px; }
+.selcafe .selname { font-size: 18px; font-weight: 800; color: var(--ink); line-height: 1.35; }
+.selcafe .seladdr, .selcafe .selmeta { font-size: 13.5px; color: var(--muted); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+.selcafe .selprice { margin-top: 10px; font-size: 14px; color: var(--ink); }
+.selcafe .selprice b { font-size: 18px; margin: 0 2px; }
+.selcafe .selbtns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.selcafe .selx { position: absolute; top: 8px; right: 10px; width: 28px; height: 28px; border: 0; background: transparent; font-size: 22px; line-height: 1; color: var(--muted); cursor: pointer; border-radius: 6px; }
+.selcafe .selx:hover { background: var(--line); color: var(--ink); }
+@media (max-width: 900px) { .selcafe { top: 8px; } }
