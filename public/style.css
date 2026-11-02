@@ -511,3 +511,40 @@ h1, h2, h3, .hero h1 { word-break: keep-all; }
   .reslayout.withmap { grid-template-columns: 1fr; }
   .withmap .mapbox { position: relative; top: 0; height: 340px; min-height: 0; order: -1; }
 }
+
+/* 로그인·회원가입 창: 라벨이 위에 있는 입력칸, 소셜 버튼, 비밀번호 확인, 약관 동의 */
+.auth { max-width: 400px; margin: 0 auto; }
+.auth h2 { font-size: 24px; margin: 0; }
+.authsub { margin: 4px 0 18px; font-size: 14px; }
+.aform { display: grid; gap: 14px; }
+.af { display: grid; gap: 6px; min-width: 0; }
+.af > label { font-size: 13px; font-weight: 700; color: var(--ink); }
+.af input[type=email], .af input[type=password], .af input[type=text], .af input[type=tel] {
+  width: 100%; min-width: 0; height: 44px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); font-size: 15px;
+}
+.af input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); outline: none; }
+.af .phonerow { display: flex; gap: 8px; }
+.af .phonerow input { flex: 1; }
+.af .phonerow .btn { height: 44px; padding: 0 14px; white-space: nowrap; }
+.hint { margin: 0; font-size: 12.5px; color: var(--muted); }
+.hint.good { color: var(--cheap); }
+.hint.bad { color: var(--pricey); }
+.hint:empty { display: none; }
+.agree { display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; }
+.agree input { width: 18px; height: 18px; accent-color: var(--gold); flex: none; }
+.agree span { flex: 1; }
+.agree em { color: var(--pricey); font-style: normal; font-size: 12.5px; }
+.linkbtn { border: 0; background: none; padding: 0; color: var(--muted); font-size: 13px; text-decoration: underline; cursor: pointer; }
+.linkbtn.strong { color: var(--gold-deep); font-weight: 700; text-decoration: none; }
+.demo { margin: 0; font-size: 12.5px; color: var(--muted); text-align: center; }
+.aform .err { margin: 0; }
+.aform .err:empty { display: none; }
+.socialbox { display: grid; gap: 8px; }
+.soc { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 46px; border: 0; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: none; }
+.soc.kakao { background: #fee500; color: #191919; }
+.soc.naver { background: #03c75a; color: #fff; }
+.soc .nmark { font-size: 17px; font-weight: 900; line-height: 1; }
+.soc:hover { filter: brightness(.96); }
+.orline { display: flex; align-items: center; gap: 10px; margin: 16px 0; color: var(--muted); font-size: 12.5px; }
+.orline::before, .orline::after { content: ''; flex: 1; height: 1px; background: var(--line-strong); }
+.authfoot { margin: 18px 0 0; text-align: center; font-size: 13.5px; color: var(--muted); }

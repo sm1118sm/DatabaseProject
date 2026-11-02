@@ -976,29 +976,41 @@
       ? `<span class="hello">${esc(u.name)}님</span><span class="pts">${u.points.toLocaleString('ko-KR')}P</span><button class="btn sm" data-act="logout">로그아웃</button>`
       : '<button class="btn sm" data-act="login">로그인</button><button class="btn sm primary" data-act="signup">회원가입</button>';
   }
-  // 서버 모드의 소셜 로그인 버튼 (카카오·네이버). 서버에 키가 설정되지 않았으면 눌러도 안내만 나온다.
-  const socialHtml = () => (API.on ? `<div class="social"><span class="muted" style="font-size:13px">간편하게 시작하기</span>
-      ${[['kakao', '카카오', API.social.KAKAO], ['naver', '네이버', API.social.NAVER]].map(([k, t, on]) => (on
-    ? `<a class="btn" href="/api/auth/${k}/start">${t}로 시작하기</a>`
-    : `<button type="button" class="btn" data-act="socialOff" data-n="${t}">${t}로 시작하기</button>`)).join('')}</div>` : '');
+  // 카카오·네이버 버튼. 서버가 있고 키가 설정돼 있으면 실제 로그인으로 이동하고, 아니면 이유를 안내한다.
+  const KAKAO_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7l-1 3.6c-.1.3.3.6.6.4l4.2-2.8c.5.1 1 .1 1.5.1 5.5 0 10-3.6 10-8S17.5 3 12 3z" fill="#191919"/></svg>';
+  const socialHtml = (mode) => {
+    const word = mode === 'signup' ? '시작하기' : '로그인';
+    return `<div class="socialbox">${[['kakao', '카카오', KAKAO_ICON, API.on && API.social.KAKAO], ['naver', '네이버', '<b class="nmark">N</b>', API.on && API.social.NAVER]].map(([k, t, ic, on]) => (on
+      ? `<a class="soc ${k}" href="/api/auth/${k}/start">${ic}<span>${t}로 ${word}</span></a>`
+      : `<button type="button" class="soc ${k}" data-act="socialOff" data-n="${t}">${ic}<span>${t}로 ${word}</span></button>`)).join('')}</div>`;
+  };
+  const orLine = (t) => `<div class="orline"><span>${t}</span></div>`;
   function openAuth(mode, after) {
     S.pending = after || null;
     SV.phoneOk = '';
     const signup = mode === 'signup';
-    openModal(`<h2>${signup ? '회원가입' : '로그인'}</h2><p class="muted" style="margin:0">${signup ? '가입하면 10,000P를 드려요.' : '로그인하고 예약과 후기를 남겨 보세요.'}</p>
-      <form class="form" data-form="${mode}">
-        <input id="aEmail" type="email" placeholder="이메일" autocomplete="email" required>
-        <input id="aPw" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="${signup ? 'new-password' : 'current-password'}" required minlength="6">
-        ${signup ? '<input id="aName" type="text" placeholder="이름" required>' : '<p class="muted" style="margin:0;font-size:13px">데모 계정: demo@example.com / demo1234 <button type="button" class="btn sm" data-act="fillDemo">입력하기</button></p>'}
-        ${signup && API.on ? `<div class="phonerow"><input id="aPhone" type="tel" inputmode="numeric" placeholder="휴대폰 번호 (010-1234-5678)" autocomplete="tel" required><button type="button" class="btn sm" data-act="phoneSend">인증번호 받기</button></div>
-          <div class="phonerow"><input id="aCode" type="text" inputmode="numeric" maxlength="6" placeholder="인증번호 6자리"><button type="button" class="btn sm" data-act="phoneVerify">확인</button></div>
-          <p class="muted" id="phoneMsg" style="margin:0;font-size:13px">한 번호로 한 번만 가입할 수 있어요.</p>` : ''}
-        <p class="err" id="authErr"></p>
+    const f = (id, label, input, hint = '') => `<div class="af"><label for="${id}">${label}</label>${input}${hint}</div>`;
+    openModal(`<div class="auth">
+      <h2>${signup ? '회원가입' : '로그인'}</h2>
+      <p class="muted authsub">${signup ? '가입하면 10,000P를 드려요.' : '로그인하고 예약과 후기를 남겨 보세요.'}</p>
+      ${signup ? `${socialHtml(mode)}${orLine('또는 이메일로 가입')}` : ''}
+      <form class="aform" data-form="${mode}">
+        ${f('aEmail', signup ? '이메일 (아이디)' : '이메일 (아이디)', `<input id="aEmail" type="email" placeholder="name@example.com" autocomplete="email" required>`)}
+        ${f('aPw', '비밀번호', `<input id="aPw" type="password" placeholder="${signup ? '6자 이상' : '비밀번호'}" autocomplete="${signup ? 'new-password' : 'current-password'}" required minlength="6">`)}
+        ${signup ? f('aPw2', '비밀번호 확인', '<input id="aPw2" type="password" placeholder="비밀번호를 한 번 더 입력" autocomplete="new-password" required minlength="6">', '<p class="hint" id="pwMatch"></p>') : ''}
+        ${signup ? f('aName', '이름', '<input id="aName" type="text" placeholder="이름" autocomplete="name" maxlength="50" required>') : ''}
+        ${signup && API.on ? `${f('aPhone', '휴대폰 번호', '<div class="phonerow"><input id="aPhone" type="tel" inputmode="numeric" placeholder="010-1234-5678" autocomplete="tel" required><button type="button" class="btn" data-act="phoneSend">인증번호 받기</button></div>')}
+          ${f('aCode', '인증번호', '<div class="phonerow"><input id="aCode" type="text" inputmode="numeric" maxlength="6" placeholder="6자리"><button type="button" class="btn" data-act="phoneVerify">확인</button></div>', '<p class="hint" id="phoneMsg">한 번호로 한 번만 가입할 수 있어요.</p>')}` : ''}
+        ${signup ? `<label class="agree"><input id="aAgree" type="checkbox"><span>이용약관과 개인정보 수집·이용에 동의해요 <em>(필수)</em></span><button type="button" class="linkbtn" data-act="soon">보기</button></label>` : ''}
+        <p class="err" id="authErr" role="alert"></p>
         <button class="btn primary lg block">${signup ? '가입하기' : '로그인'}</button>
-        ${socialHtml()}
-        <p class="muted" style="margin:0;text-align:center;font-size:13px">${signup ? '이미 계정이 있나요?' : '아직 계정이 없나요?'} <button type="button" class="btn sm" data-act="${signup ? 'login' : 'signup'}">${signup ? '로그인' : '회원가입'}</button></p>
-      </form>`);
+        ${signup ? '' : '<p class="demo">데모 계정 <b>demo@example.com</b> / <b>demo1234</b> <button type="button" class="linkbtn" data-act="fillDemo">입력하기</button></p>'}
+      </form>
+      ${signup ? '' : `${orLine('또는')}${socialHtml(mode)}`}
+      <p class="authfoot">${signup ? '이미 계정이 있나요?' : '아직 계정이 없나요?'} <button type="button" class="linkbtn strong" data-act="${signup ? 'login' : 'signup'}">${signup ? '로그인' : '회원가입'}</button></p>
+    </div>`);
   }
+
   // 서버 모드: 소셜로 막 가입해 휴대폰이 없는 회원은 인증을 마쳐야 예약·후기를 쓸 수 있다.
   // 인증하면 가입 보너스를 받고, 그 번호로 이미 가입한 계정이 있으면 그 계정에 연결된다(기존 계정의 비밀번호 확인).
   function openPhoneVerify(after) {
@@ -1060,6 +1072,10 @@
   }
   async function submitAuth(mode) {
     const email = $('#aEmail').value.trim().toLowerCase(), pw = $('#aPw').value, err = $('#authErr');
+    if (mode === 'signup') {
+      if ($('#aPw2').value !== pw) { err.textContent = '비밀번호가 서로 달라요. 다시 확인해 주세요.'; return; }
+      if (!$('#aAgree').checked) { err.textContent = '이용약관과 개인정보 수집·이용에 동의해 주세요.'; return; }
+    }
     if (API.on) return submitAuthServer(mode, email, pw, err);
     if (mode === 'signup') {
       const name = $('#aName').value.trim();
@@ -1287,7 +1303,7 @@
       } catch (e) { msg.textContent = e.message; }
     },
     pvSend, pvVerify,
-    socialOff: (t) => toast(`${t.dataset.n} 로그인은 서버에 키가 아직 설정되지 않았어요.`),
+    socialOff: (t) => toast(API.on ? `${t.dataset.n} 로그인은 서버에 키가 아직 설정되지 않았어요.` : `${t.dataset.n} 로그인은 서버가 연결된 환경에서만 쓸 수 있어요.`),
     resTab: (t) => { S.resTab = t.dataset.v; S.cancelId = null; showReservations(); },
     change: (t) => openChange(resById(t.dataset.id)),
     cancelAsk: (t) => { S.cancelId = Number(t.dataset.id); showReservations(); },
@@ -1328,6 +1344,15 @@
     else if (k === 'change') submitChange(f.dataset.id);
     else if (k === 'review') submitReview(f.dataset.id);
     else if (k === 'phone') pvVerify();
+  });
+  document.addEventListener('input', (e) => { // 회원가입: 비밀번호와 비밀번호 확인이 같은지 바로 보여 준다
+    if (e.target.id !== 'aPw' && e.target.id !== 'aPw2') return;
+    const m = $('#pwMatch'), a = $('#aPw'), b = $('#aPw2');
+    if (!m || !a || !b) return;
+    if (!b.value) { m.textContent = ''; m.className = 'hint'; return; }
+    const same = a.value === b.value;
+    m.textContent = same ? '비밀번호가 일치해요.' : '비밀번호가 서로 달라요.';
+    m.className = `hint ${same ? 'good' : 'bad'}`;
   });
   document.addEventListener('change', (e) => {
     const t = e.target;
