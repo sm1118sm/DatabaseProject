@@ -1,29 +1,65 @@
-require('dotenv').config();
+require('./dbconfig'); // 환경 변수 (ENV_FILE 로 환경 파일 선택)
 const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const pool = require('./db');
+const retryTransaction = require('./retry-transaction');
 
 const app = express();
 app.use(express.json({ limit: '200kb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// ---- 간단한 토큰 인증 (과제용: 서버 메모리에 보관) ----------------------
-const sessions = new Map(); // token -> { memberId, name }
+// ---- 서명된 토큰 인증 -----------------------------------------------------
+// 서버에 로그인 상태를 저장하지 않는다. 토큰 자체에 회원 번호와 만료 시각이 들어 있고 비밀 키(AUTH_SECRET)로 서명한다.
+// 서버리스(Vercel)에서는 요청마다 다른 인스턴스가 처리하므로 메모리에 저장하는 방식은 쓸 수 없다.
+const AUTH_SECRET = process.env.AUTH_SECRET || (process.env.VERCEL || process.env.NODE_ENV === 'production' ? '' : crypto.randomBytes(32).toString('hex'));
+if (!AUTH_SECRET) throw new Error('AUTH_SECRET 환경 변수가 필요합니다. (임의의 긴 문자열)');
+const mac = (body) => crypto.createHmac('sha256', AUTH_SECRET).update(body).digest('base64url');
+const sign = (payload) => { const body = Buffer.from(JSON.stringify(payload)).toString('base64url'); return `${body}.${mac(body)}`; };
+function unsign(token, type) { // 서명·종류·만료를 모두 확인한다
+  try {
+    const [body, sig] = String(token || '').split('.');
+    if (!body || !sig) return null;
+    const want = mac(body);
+    if (sig.length !== want.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want))) return null;
+    const p = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+    return p && p.t === type && p.exp > Date.now() ? p : null;
+  } catch { return null; }
+}
+const SESSION_MS = 7 * 24 * 3600e3;
 
 function auth(req, res, next) {
-  const token = (req.headers.authorization || '').replace('Bearer ', '');
-  const s = sessions.get(token);
-  if (!s) return res.status(401).json({ error: '로그인이 필요합니다.' });
-  req.member = s;
+  const p = unsign((req.headers.authorization || '').replace('Bearer ', ''), 's');
+  if (!p) return res.status(401).json({ error: '로그인이 필요합니다.' });
+  req.member = { memberId: p.m, name: p.n };
   next();
 }
 
+// 요청 횟수 제한 (인스턴스별로 세는 간단한 방식이라 완벽하지는 않다. 인증번호 같은 중요한 것은 DB 에서도 따로 제한한다)
+const hits = new Map();
+const limit = (name, max, windowMs) => (req, res, next) => {
+  if (process.env.NODE_ENV === 'test') return next();
+  const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+  const k = `${name}|${ip}`, now = Date.now();
+  const recent = (hits.get(k) || []).filter((t) => now - t < windowMs);
+  if (recent.length >= max) return res.status(429).json({ error: '요청이 너무 많아요. 잠시 뒤 다시 시도해 주세요.' });
+  recent.push(now); hits.set(k, recent);
+  if (hits.size > 5000) for (const [key, v] of hits) if (!v.some((t) => now - t < windowMs)) hits.delete(key);
+  next();
+};
+
+const DB_WAKING = 'DB가 깨어나는 중이에요. 잠시 뒤 다시 시도해 주세요.';
 const wrap = (fn) => (req, res) => fn(req, res).catch((e) => {
+  if (e.code === 'ER_LOCK_DEADLOCK') {
+    res.set('Retry-After', '1');
+    return res.status(503).json({ error: '예약 요청이 몰리고 있어요. 잠시 뒤 다시 시도해 주세요.', retryable: true });
+  }
   console.error(e);
+  if (e.dbDown) return res.status(503).json({ error: DB_WAKING, dbDown: true }); // 무료 DB 가 꺼져 있다가 켜지는 동안
   res.status(500).json({ error: '서버 오류가 발생했습니다.' });
 });
+const bookingWrap = (fn) => wrap((req, res) => retryTransaction(() => fn(req, res)));
 
 // 휴대폰 인증을 마친 회원만 예약·후기를 쓸 수 있다 (소셜로 막 가입한 회원은 먼저 인증해야 한다)
 async function requireVerified(req, res, next) {
@@ -34,6 +70,7 @@ async function requireVerified(req, res, next) {
     next();
   } catch (e) {
     console.error(e);
+    if (e.dbDown) return res.status(503).json({ error: DB_WAKING, dbDown: true });
     res.status(500).json({ error: '서버 오류가 발생했습니다.' });
   }
 }
@@ -51,9 +88,7 @@ const startOfHour = () => { const d = new Date(); d.setMinutes(0, 0, 0); return 
 const addHours = (d, h) => new Date(d.getTime() + h * 3600e3);
 
 function newSession(m) {
-  const token = crypto.randomBytes(24).toString('hex');
-  sessions.set(token, { memberId: m.member_id, name: m.name });
-  return token;
+  return sign({ t: 's', m: m.member_id, n: m.name, exp: Date.now() + SESSION_MS });
 }
 const publicMember = (m) => ({ email: m.email, name: m.name, points: m.point_balance, phoneVerified: !!m.phone_verified });
 
@@ -91,7 +126,7 @@ const normPhone = (s) => String(s || '').replace(/\D/g, '');
 const phoneOk = (p) => /^01[016789]\d{7,8}$/.test(p);
 const codeHash = (phone, code) => crypto.createHash('sha256').update(`${phone}:${code}:${process.env.PHONE_SALT || 'studymoa'}`).digest('hex');
 
-app.post('/api/phone/send', wrap(async (req, res) => {
+app.post('/api/phone/send', limit('phone', 10, 3600e3), wrap(async (req, res) => {
   const phone = normPhone(req.body && req.body.phone);
   if (!phoneOk(phone)) return res.status(400).json({ error: '휴대폰 번호 형식을 확인해 주세요. (예: 010-1234-5678)' });
   const [[dup]] = await pool.query('SELECT member_id FROM member WHERE phone = ?', [phone]);
@@ -104,7 +139,7 @@ app.post('/api/phone/send', wrap(async (req, res) => {
   res.json({ ok: true, expiresInSec: 300, mock: true, devCode: code });
 }));
 
-app.post('/api/phone/verify', wrap(async (req, res) => {
+app.post('/api/phone/verify', limit('verify', 40, 3600e3), wrap(async (req, res) => {
   const phone = normPhone(req.body && req.body.phone), code = String((req.body && req.body.code) || '').trim();
   const [[v]] = await pool.query(
     'SELECT verify_id, code_hash, attempts FROM phone_verification WHERE phone = ? AND verified_at IS NULL AND expires_at > NOW() ORDER BY verify_id DESC LIMIT 1', [phone]);
@@ -118,7 +153,7 @@ app.post('/api/phone/verify', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-app.post('/api/signup', wrap(async (req, res) => {
+app.post('/api/signup', limit('signup', 15, 3600e3), wrap(async (req, res) => {
   const body = req.body || {};
   const email = String(body.email || '').trim().toLowerCase(), password = String(body.password || ''), name = String(body.name || '').trim();
   const phone = normPhone(body.phone);
@@ -158,7 +193,7 @@ app.post('/api/signup', wrap(async (req, res) => {
   }
 }));
 
-app.post('/api/login', wrap(async (req, res) => {
+app.post('/api/login', limit('login', 40, 600e3), wrap(async (req, res) => {
   const email = String((req.body && req.body.email) || '').trim().toLowerCase(), password = String((req.body && req.body.password) || '');
   const [[m]] = await pool.query('SELECT member_id, email, password_hash, name, point_balance, phone_verified FROM member WHERE email = ?', [email]);
   if (m && !m.password_hash) return res.status(400).json({ error: '소셜 로그인으로 가입한 계정이에요. 카카오·네이버로 로그인해 주세요.' });
@@ -180,7 +215,7 @@ app.get('/api/me', auth, wrap(async (req, res) => {
 // 소셜로 막 가입한 회원은 휴대폰이 없다. 인증번호로 번호를 확인한 뒤 번호를 저장하고 가입 보너스를 준다.
 // 그 번호로 이미 가입한 계정이 있으면 새 계정을 만들지 않고 그 계정에 소셜 계정을 연결한다.
 // 단, 인증번호가 화면에 그대로 보이는 모의 모드에서는 번호만으로 남의 계정을 가로챌 수 있으므로 기존 계정의 비밀번호도 함께 확인한다.
-app.post('/api/me/phone/send', auth, wrap(async (req, res) => {
+app.post('/api/me/phone/send', auth, limit('phone', 10, 3600e3), wrap(async (req, res) => {
   const phone = normPhone(req.body && req.body.phone);
   if (!phoneOk(phone)) return res.status(400).json({ error: '휴대폰 번호 형식을 확인해 주세요. (예: 010-1234-5678)' });
   const [[me]] = await pool.query('SELECT phone_verified FROM member WHERE member_id = ?', [req.member.memberId]);
@@ -195,9 +230,8 @@ app.post('/api/me/phone/send', auth, wrap(async (req, res) => {
   res.json({ ok: true, expiresInSec: 300, mock: true, devCode: code, existing: !!other, needsPassword: !!(other && other.password_hash) });
 }));
 
-app.post('/api/me/phone/verify', auth, wrap(async (req, res) => {
+app.post('/api/me/phone/verify', auth, limit('verify', 40, 3600e3), wrap(async (req, res) => {
   const phone = normPhone(req.body && req.body.phone), code = String((req.body && req.body.code) || '').trim(), password = String((req.body && req.body.password) || '');
-  const token = (req.headers.authorization || '').replace('Bearer ', '');
   const [[v]] = await pool.query(
     'SELECT verify_id, code_hash, attempts FROM phone_verification WHERE phone = ? AND verified_at IS NULL AND expires_at > NOW() ORDER BY verify_id DESC LIMIT 1', [phone]);
   if (!v) return res.status(400).json({ error: '인증번호가 만료됐어요. 다시 요청해 주세요.' });
@@ -244,8 +278,7 @@ app.post('/api/me/phone/verify', auth, wrap(async (req, res) => {
     await conn.query('DELETE FROM member WHERE member_id = ?', [mine.member_id]); // 인증 전에 만들어진 빈 계정은 지운다 (보너스도 받지 않은 상태)
     await conn.query('UPDATE phone_verification SET verified_at = NOW() WHERE verify_id = ?', [v.verify_id]);
     await conn.commit();
-    sessions.set(token, { memberId: other.member_id, name: other.name }); // 이 로그인은 이제 기존 계정으로 이어진다
-    res.json({ ok: true, merged: true, ...publicMember(other) });
+    res.json({ ok: true, merged: true, token: newSession(other), ...publicMember(other) }); // 이 로그인은 이제 기존 계정으로 이어진다 (새 토큰)
   } catch (e) {
     await conn.rollback();
     throw e;
@@ -257,8 +290,6 @@ app.post('/api/me/phone/verify', auth, wrap(async (req, res) => {
 // ---- 소셜 로그인 (카카오·네이버) ---------------------------------------------
 // 카카오 개발자 콘솔에서 '카카오 로그인'을 켜고 Redirect URI 를 등록해야 동작한다. 네이버는 NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 이 필요하다.
 // 같은 소셜 계정은 한 회원에만 연결된다 (member_social 의 기본키).
-const oauthState = new Map(); // state -> { provider, exp }
-const tickets = new Map();    // 1회용 로그인 티켓 -> { member, exp }
 const baseUrl = (req) => process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
 const PROVIDERS = {
   KAKAO: {
@@ -294,17 +325,20 @@ app.get('/api/auth/:provider/start', (req, res) => {
   const p = PROVIDERS[String(req.params.provider).toUpperCase()];
   if (!p) return res.status(404).json({ error: '지원하지 않는 로그인 방식이에요.' });
   if (!p.enabled()) return res.status(501).json({ error: '이 소셜 로그인은 아직 설정되지 않았어요.' });
-  const state = crypto.randomBytes(16).toString('hex');
-  oauthState.set(state, { provider: String(req.params.provider).toUpperCase(), exp: Date.now() + 10 * 60e3 });
+  // state 는 서명해서 서버에 저장하지 않고, 같은 값(nonce)을 이 브라우저의 쿠키에도 둔다. 돌아올 때 둘이 같아야 한다 (남이 시작한 로그인으로 낚는 것을 막는다).
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const state = sign({ t: 'o', p: String(req.params.provider).toUpperCase(), n: nonce, exp: Date.now() + 10 * 60e3 });
+  res.setHeader('Set-Cookie', `oauth_nonce=${nonce}; Path=/api/auth; Max-Age=600; HttpOnly; SameSite=Lax${req.secure || req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : ''}`);
   res.redirect(p.authorize(req, state));
 });
 
 app.get('/api/auth/:provider/callback', wrap(async (req, res) => {
   const name = String(req.params.provider).toUpperCase(), p = PROVIDERS[name];
-  const st = oauthState.get(String(req.query.state || ''));
-  oauthState.delete(String(req.query.state || ''));
+  const st = unsign(String(req.query.state || ''), 'o');
+  const cookieNonce = (/(?:^|;\s*)oauth_nonce=([0-9a-f]+)/.exec(req.headers.cookie || '') || [])[1];
+  res.setHeader('Set-Cookie', 'oauth_nonce=; Path=/api/auth; Max-Age=0; HttpOnly; SameSite=Lax'); // 한 번 쓰면 지운다
   const fail = (m) => res.redirect(`/#login-error=${encodeURIComponent(m)}`);
-  if (!p || !st || st.provider !== name || st.exp < Date.now()) return fail('로그인 요청이 만료됐어요. 다시 시도해 주세요.');
+  if (!p || !st || st.p !== name || !cookieNonce || st.n !== cookieNonce) return fail('로그인 요청이 만료됐어요. 다시 시도해 주세요.');
   if (!req.query.code) return fail('로그인을 취소했어요.');
   let prof;
   try { prof = await p.profile(req, String(req.query.code), String(req.query.state)); } catch { return fail('소셜 로그인에 실패했어요. 설정을 확인해 주세요.'); }
@@ -331,9 +365,7 @@ app.get('/api/auth/:provider/callback', wrap(async (req, res) => {
       await conn.query('INSERT INTO member_social (provider, provider_user_id, member_id) VALUES (?, ?, ?)', [name, prof.id, m.member_id]);
     }
     await conn.commit();
-    const ticket = crypto.randomBytes(24).toString('hex');
-    tickets.set(ticket, { member: m, exp: Date.now() + 2 * 60e3 });
-    res.redirect(`/#social=${ticket}`);
+    res.redirect(`/#social=${sign({ t: 'k', m: m.member_id, exp: Date.now() + 2 * 60e3 })}`); // 2분짜리 티켓 (주소의 # 뒤에 담겨 서버 기록에 남지 않는다)
   } catch (e) {
     await conn.rollback();
     console.error(e);
@@ -344,10 +376,11 @@ app.get('/api/auth/:provider/callback', wrap(async (req, res) => {
 }));
 
 app.post('/api/auth/exchange', wrap(async (req, res) => { // 소셜 로그인 뒤 받은 1회용 티켓을 로그인 토큰으로 바꾼다
-  const t = tickets.get(String((req.body && req.body.ticket) || ''));
-  tickets.delete(String((req.body && req.body.ticket) || ''));
-  if (!t || t.exp < Date.now()) return res.status(400).json({ error: '로그인 요청이 만료됐어요.' });
-  res.json({ token: newSession(t.member), ...publicMember(t.member) });
+  const t = unsign(String((req.body && req.body.ticket) || ''), 'k');
+  if (!t) return res.status(400).json({ error: '로그인 요청이 만료됐어요.' });
+  const [[m]] = await pool.query('SELECT member_id, email, name, point_balance, phone_verified FROM member WHERE member_id = ?', [t.m]);
+  if (!m) return res.status(400).json({ error: '로그인 요청이 만료됐어요.' });
+  res.json({ token: newSession(m), ...publicMember(m) });
 }));
 
 // ---- 카페 목록 (시·구 평균 대비) ------------------------------------------
@@ -420,7 +453,7 @@ app.get('/api/cafes/:id(\\d+)', wrap(async (req, res) => {
 // 카카오에서 가져온 카페는 예약이 처음 생길 때만 DB 에 저장한다. 전국 목록을 통째로 저장하지 않는다.
 // 좌석 수와 요금은 화면의 '예시' 값을 그대로 쓰며 price_source 는 EXAMPLE 이다.
 const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n >= lo && n <= hi ? n : null; };
-app.post('/api/cafes/ensure', auth, wrap(async (req, res) => {
+app.post('/api/cafes/ensure', auth, limit('ensure', 60, 3600e3), wrap(async (req, res) => {
   const b = req.body || {};
   const placeId = b.placeId == null ? '' : String(b.placeId).slice(0, 30);
   const name = String(b.name || '').trim().slice(0, 100), address = String(b.address || '').trim().slice(0, 200);
@@ -538,7 +571,7 @@ const spanFromRow = (r) => { // 저장된 예약의 길이로 시간제/기간�
   return h > 12 ? { mode: 'PERIOD', plan: { 24: 'DAY', 168: 'WEEK', 720: 'MONTH' }[h] || 'DAY', hours: h } : { mode: 'HOURLY', plan: null, hours: h };
 };
 
-app.post('/api/reservations', auth, requireVerified, wrap(async (req, res) => {
+app.post('/api/reservations', auth, requireVerified, bookingWrap(async (req, res) => {
   const b = req.body || {};
   const span = bookingSpan({ mode: b.mode === 'PERIOD' ? 'PERIOD' : 'HOURLY', date: b.date, startHour: b.startHour, hours: b.hours, plan: b.plan });
   if (!span || (!b.cafeId && !b.seatId && !b.roomId)) return res.status(400).json({ error: '예약 정보가 올바르지 않습니다.' });
@@ -655,7 +688,7 @@ app.post('/api/reservations/:id(\\d+)/cancel', auth, wrap(async (req, res) => {
 }));
 
 // 예약 변경: 같은 좌석에서 날짜·시간을 바꾼다. 새 시간이 비어 있어야 하고, 요금 차액은 포인트 결제일 때만 포인트로 정산한다.
-app.put('/api/reservations/:id(\\d+)', auth, wrap(async (req, res) => {
+app.put('/api/reservations/:id(\\d+)', auth, bookingWrap(async (req, res) => {
   const id = Number(req.params.id), b = req.body || {};
   const conn = await pool.getConnection();
   try {
