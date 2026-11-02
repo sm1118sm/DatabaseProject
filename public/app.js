@@ -100,17 +100,32 @@
   // 서버(npm start)가 떠 있으면 로그인·예약·후기·포인트를 서버 DB 로 처리하고, 정적 배포(Vercel)에서는 위의 브라우저 저장소로 동작한다.
   const API = { on: false, token: null, social: {} };
   const TOKEN_KEY = 'studymoa:token';
-  const SV = { user: null, res: [], taken: new Map(), takenLoading: new Set(), reviews: new Map(), dbId: new Map(), phoneOk: '' };
+  const SV = { user: null, res: [], taken: new Map(), takenLoading: new Set(), takenError: new Set(), reviews: new Map(), dbId: new Map(), phoneOk: '' };
   const placeIdOf = (c) => (c.real ? String(c.id) : `sample-${c.id}`); // 서버가 카페를 알아보는 번호 (카카오 장소 번호)
   const saveToken = (t) => { API.token = t; try { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); } catch { /* 저장소 사용 불가 */ } };
   async function api(method, path, body) {
     const r = await fetch(path, { method, headers: { 'content-type': 'application/json', ...(API.token ? { authorization: `Bearer ${API.token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
     let d = null; try { d = await r.json(); } catch { /* 본문 없음 */ }
-    if (r.status === 401 && API.token) { saveToken(null); SV.user = null; SV.res = []; renderUser(); } // 서버가 다시 켜지면 로그인이 풀린다
+    if (r.status === 401 && API.token) { saveToken(null); SV.user = null; SV.res = []; renderUser(); } // 인증 실패일 때만 로그인 정보를 지운다
     if (!r.ok) { const e = new Error((d && d.error) || '요청에 실패했어요. 잠시 뒤 다시 시도해 주세요.'); e.status = r.status; e.data = d || {}; throw e; }
     return d;
   }
   const setUser = (d) => { SV.user = { email: d.email, name: d.name, points: d.points, phoneVerified: d.phoneVerified !== false }; };
+  async function restoreSession() {
+    if (!API.token || API.restoring) return false;
+    const token = API.token;
+    API.restoring = true;
+    try {
+      const d = await api('GET', '/api/me');
+      if (API.token !== token) return false;
+      setUser(d); return true;
+    } catch { return false; } // 일시 장애는 토큰을 보존한다. 401 처리는 api()가 맡는다.
+    finally { API.restoring = false; }
+  }
+  async function recoverSession() {
+    if (!API.on || !API.token || SV.user) return;
+    if (await restoreSession()) { await loadMyRes(); renderUser(); route(); }
+  }
   async function detectServer() {
     try {
       const r = await fetch('/api/config', { cache: 'no-store' });
@@ -119,7 +134,7 @@
       if (!d || d.server !== true) return;
       API.on = true; API.social = d.social || {};
       try { API.token = localStorage.getItem(TOKEN_KEY); } catch { /* 저장소 사용 불가 */ }
-      if (API.token) { try { setUser(await api('GET', '/api/me')); } catch { saveToken(null); } }
+      if (API.token) await restoreSession();
     } catch { /* 서버 없는 정적 배포 */ }
   }
   // 서버 예약 내역을 화면이 쓰는 모양(저장소 모드의 예약과 같은 필드)으로 바꾼다
@@ -210,19 +225,23 @@
   const takenKey = (c, type, o, skipId) => `${c.id}|${type}|${o.mode}|${o.date}|${o.mode === 'HOURLY' ? `${o.start}-${o.end}` : o.plan}|${skipId || 0}`;
   function ensureTaken(c, type, o, skipId, done) {
     const k = takenKey(c, type, o, skipId);
-    if (SV.taken.has(k) || SV.takenLoading.has(k)) return;
+    if (SV.taken.has(k) || SV.takenLoading.has(k) || SV.takenError.has(k)) return;
     SV.takenLoading.add(k);
     const qs = new URLSearchParams({ type, date: o.date, ...(o.mode === 'HOURLY' ? { start: o.start, end: o.end } : { days: DAYS[o.plan] }), ...(skipId ? { skip: skipId } : {}) });
     api('GET', `/api/cafes/by-place/${encodeURIComponent(placeIdOf(c))}/taken?${qs}`)
-      .then((d) => { SV.taken.set(k, new Set(d.taken)); })
-      .catch(() => { SV.taken.set(k, new Set()); })
+      .then((d) => {
+        if (!Array.isArray(d.taken)) throw new Error('좌석 정보를 확인하지 못했어요.');
+        SV.taken.set(k, new Set(d.taken)); SV.takenError.delete(k);
+      })
+      .catch(() => { SV.takenError.add(k); })
       .finally(() => { SV.takenLoading.delete(k); if (done) done(); });
   }
   function avail(c, type, o, skipId) {
     const keys = seatKeys(c, type);
     const got = API.on ? SV.taken.get(takenKey(c, type, o, skipId)) : null;
     const taken = new Set(API.on ? keys.filter((k) => got && got.has(seatLabel(k, type))) : keys.filter((k) => takenSeed(c, k, o) || takenUser(c, k, o, skipId)));
-    return { keys, taken, total: keys.length, free: keys.length - taken.size };
+    const ready = !API.on || !!got;
+    return { keys, taken, ready, failed: API.on && SV.takenError.has(takenKey(c, type, o, skipId)), total: keys.length, free: ready ? keys.length - taken.size : null };
   }
 
   // ---- 후기 ------------------------------------------------------------------------
@@ -414,7 +433,7 @@
     const [cls, tag] = diffTag(diff);
     const pct = clamp(50 + (avg ? (diff / avg) * 100 : 0), 5, 95);
     const rank = S.q.sort === 'price' && idx < 3 ? `<span class="tag rank">최저가 ${idx + 1}위</span>` : '';
-    const seats = av.free === 0 ? '<span class="cseats none">만석 · 다른 시간 확인</span>' : `<span class="cseats${av.free <= 3 ? ' few' : ''}">잔여 ${av.free}/${av.total}석</span>`;
+    const seats = !av.ready ? '<span class="cseats">좌석 현황 확인 필요</span>' : av.free === 0 ? '<span class="cseats none">만석 · 다른 시간 확인</span>' : `<span class="cseats${av.free <= 3 ? ' few' : ''}">잔여 ${av.free}/${av.total}석</span>`;
     const where = [c.station ? `<span>${ico('train', 14)}${esc(c.station)}</span>` : '', c.univ ? `<span>${ico('school', 14)}${esc(c.univ)}</span>` : ''].join('');
     return `<li class="card${S.hl === c.id ? ' hl' : ''}" id="card-${c.id}" data-act="open" data-id="${c.id}">
       <div class="thumbbox">${photo(c, 0)}<div class="tags">${rank}${c.fac.includes('h') ? '<span class="tag">24시간</span>' : ''}${c.real ? '<span class="tag">요금 예시</span>' : ''}</div></div>
@@ -433,7 +452,7 @@
     if (!it) return '';
     const { c, p, d, av } = it;
     const meta = [`${esc(c.sigungu)} · ${km(d)}`, c.phone ? esc(c.phone) : ''].filter(Boolean).join(' · ');
-    const seats = av.free === 0 ? '만석' : `잔여 ${av.free}/${av.total}석`;
+    const seats = !av.ready ? '좌석 현황 확인 필요' : av.free === 0 ? '만석' : `잔여 ${av.free}/${av.total}석`;
     return `<div class="selcafe" id="selcafe" role="region" aria-label="지도에서 선택한 스터디카페">
       <button class="selx" data-act="unsel" aria-label="선택 닫기">×</button>
       <div class="selk">지도에서 선택한 스터디카페</div>
@@ -868,12 +887,13 @@
     if (!box) return;
     const av = avail(c, b.type, b);
     if (API.on) ensureTaken(c, b.type, b, 0, () => { if (S.book === b) refreshBook(); }); // 서버에서 받아오면 다시 그린다
-    if (b.seat && av.taken.has(b.seat)) b.seat = null;
+    if (!av.ready || (b.seat && av.taken.has(b.seat))) b.seat = null;
     const when =`${fmtDate(b.date)} ${b.mode === 'HOURLY' ? `${hh(b.start)}–${hh(b.end)}` : `${PLAN[b.plan]} 시작`}`;
-    box.innerHTML = `<div class="seatstat"><div><div class="big">${SEAT[b.type]} ${av.free}/${av.total}석 이용 가능</div><div class="muted" style="font-size:13px">${esc(when)} 기준</div></div>
+    box.innerHTML = `<div class="seatstat"><div><div class="big">${av.ready ? `${SEAT[b.type]} ${av.free}/${av.total}석 이용 가능` : av.failed ? '좌석 현황을 확인하지 못했어요' : '좌석 현황 확인 중…'}</div><div class="muted" style="font-size:13px">${esc(when)} 기준</div></div>
       <div class="legend"><span><i class="f"></i>예약 가능</span><span><i class="t"></i>사용 중</span><span><i class="s"></i>선택</span></div></div>
       <div class="seatmap"><div class="screen">${b.type === 'ROOM' ? 'ROOMS' : 'ENTRANCE'}</div>
-        <div class="seats${b.type === 'ROOM' ? ' rooms' : ''}">${av.keys.map((k) => `<button class="seat${b.seat === k ? ' sel' : ''}" data-act="bseat" data-k="${k}" ${av.taken.has(k) ? 'disabled' : ''} aria-label="${seatLabel(k, b.type)}${av.taken.has(k) ? ' (사용 중)' : ''}">${b.type === 'ROOM' ? `룸 ${k.slice(1)}<br><small>최대 ${c.roomCap}인</small>` : k.slice(1)}</button>`).join('')}</div></div>`;
+        <div class="seats${b.type === 'ROOM' ? ' rooms' : ''}">${av.keys.map((k) => `<button class="seat${b.seat === k ? ' sel' : ''}" data-act="bseat" data-k="${k}" ${!av.ready || av.taken.has(k) ? 'disabled' : ''} aria-label="${seatLabel(k, b.type)}${!av.ready ? ' (확인 필요)' : av.taken.has(k) ? ' (사용 중)' : ''}">${b.type === 'ROOM' ? `룸 ${k.slice(1)}<br><small>최대 ${c.roomCap}인</small>` : k.slice(1)}</button>`).join('')}</div></div>
+      ${av.failed ? '<p class="err" role="status">잠시 뒤 좌석 현황을 다시 확인해 주세요.</p><button class="btn sm" data-act="retrySeats">좌석 현황 다시 확인</button>' : ''}`;
   }
 
   function renderBook() {
@@ -881,7 +901,8 @@
     if (!box) return;
     const err = timeError(c, b);
     const total = bookTotal(), unit = price(c, b.type, b.mode, b.plan);
-    const label = err ? '시간을 확인해 주세요' : !b.seat ? '좌석을 선택해 주세요' : `${won(total)} 결제하기`;
+    const ready = avail(c, b.type, b).ready;
+    const label = !ready ? '좌석 현황을 먼저 확인해 주세요' : err ? '시간을 확인해 주세요' : !b.seat ? '좌석을 선택해 주세요' : `${won(total)} 결제하기`;
     box.innerHTML = `<h3>예약하기</h3>
       <div class="field"><span class="lbl">이용 형태</span><div class="seg"><button data-act="bmode" data-v="HOURLY" aria-pressed="${b.mode === 'HOURLY'}">시간제</button><button data-act="bmode" data-v="PERIOD" aria-pressed="${b.mode === 'PERIOD'}" ${b.type === 'ROOM' ? 'disabled title="스터디룸은 시간제만 가능해요"' : ''}>기간제</button></div></div>
       <div class="field"><span class="lbl">좌석 유형</span><div class="seg">${['NORMAL', 'FOCUS', 'ROOM'].map((t) => `<button data-act="btype" data-v="${t}" aria-pressed="${b.type === t}">${SEAT[t]}</button>`).join('')}</div></div>
@@ -898,14 +919,16 @@
         ${err ? '' : `<div class="total"><span>결제 금액</span><span>${won(total)}</span></div>`}</div>`
       : '<p class="seathint">아래 좌석 현황에서 원하는 좌석을 선택하면 요금이 표시돼요. 선택한 좌석을 다시 누르면 해제돼요.</p>'}
       ${err ? `<p class="err">${esc(err)}</p>` : ''}
-      <button class="btn primary lg block" style="margin-top:14px" data-act="pay" ${err || !b.seat ? 'disabled' : ''}>${label}</button>
+      <button class="btn primary lg block" style="margin-top:14px" data-act="pay" ${!ready || err || !b.seat ? 'disabled' : ''}>${label}</button>
       <p class="refund">이용 1시간 전까지 취소하면 100% 환불, 이후에는 50% 환불돼요. (기간제는 시작 전 100%)</p>`;
   }
 
   // ---- 결제 ----------------------------------------------------------------------------
   function openPay() {
     const u = me(), b = S.book, c = cafeById(b.cafeId);
+    if (API.on && API.token && !u) { recoverSession(); toast('로그인 상태를 다시 확인하고 있어요. 잠시 뒤 다시 시도해 주세요.'); return; }
     if (!u) { openAuth('login', openPay); return; }
+    if (!avail(c, b.type, b).ready) { toast('좌석 현황을 먼저 확인해 주세요.'); return; }
     const err = timeError(c, b);
     if (err || !b.seat) { toast(err || '좌석을 선택해 주세요.'); return; }
     openModal(`<div class="stepdots"><i class="on"></i><i></i></div><h2>결제</h2><p class="muted" style="margin:0 0 12px">모의 결제예요. 실제로 돈이 빠져나가지 않아요.</p>
@@ -1040,6 +1063,7 @@
     const err = $('#pvErr'); err.textContent = '';
     try {
       const d = await api('POST', '/api/me/phone/verify', { phone: $('#pvPhone').value, code: $('#pvCode').value, password: $('#pvPw').value });
+      if (d.token) saveToken(d.token); // 기존 계정에 연결되면 로그인이 그 계정으로 바뀌므로 새 토큰으로 교체한다
       setUser(d); SV.taken.clear(); await loadMyRes(); renderUser(); closeModal();
       toast(d.merged ? '기존 계정에 소셜 계정을 연결했어요.' : '휴대폰 인증이 완료됐어요. 10,000P가 적립됐어요.');
       const next = S.pending; S.pending = null;
@@ -1267,6 +1291,10 @@
     sort: (t) => { S.q.sort = t.dataset.v; S.limit = PAGE; renderResults(); },
     more: () => { S.limit += 12; renderResults(); },
     retryMap: () => { initKakao(); refreshMaps(); },
+    retrySeats: () => {
+      const b = S.book, c = cafeById(b.cafeId);
+      SV.takenError.delete(takenKey(c, b.type, b)); refreshBook();
+    },
     view: (t) => { S.q.view = t.dataset.v; renderResults(); },
     unsel: () => { S.hl = null; renderResults(); },
     pin: (t) => {
@@ -1277,7 +1305,11 @@
     bmode: (t) => { S.book.mode = t.dataset.v; refreshBook(); },
     btype: (t) => { S.book.type = t.dataset.v; if (S.book.type === 'ROOM') S.book.mode = 'HOURLY'; S.book.seat = null; refreshBook(); },
     bplan: (t) => { S.book.plan = t.dataset.v; refreshBook(); },
-    bseat: (t) => { S.book.seat = S.book.seat === t.dataset.k ? null : t.dataset.k; refreshBook(); }, // 선택한 좌석을 다시 누르면 해제
+    bseat: (t) => {
+      const b = S.book, av = avail(cafeById(b.cafeId), b.type, b);
+      if (!av.ready || av.taken.has(t.dataset.k)) return;
+      b.seat = b.seat === t.dataset.k ? null : t.dataset.k; refreshBook();
+    }, // 선택한 좌석을 다시 누르면 해제
     pay: openPay, payGo,
     toRes: () => { closeModal(); location.hash = 'reservations'; },
     login: () => openAuth('login', S.pending), signup: () => openAuth('signup', S.pending),
@@ -1388,6 +1420,8 @@
     else { showHome(); window.scrollTo(0, 0); }
   }
   window.addEventListener('hashchange', () => { closeModal(); route(); });
+  window.addEventListener('online', recoverSession);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) recoverSession(); });
 
   async function init() {
     $('#logoMark').innerHTML = ico('book', 20);
@@ -1414,6 +1448,10 @@
     watchLocationPermission();
     initKakao();
     route();
+    if (API.on && API.token && !SV.user) {
+      toast('로그인 상태를 확인하지 못했어요. 잠시 뒤 다시 확인합니다.');
+      window.setTimeout(recoverSession, 5000);
+    }
     if (API.on && SV.user && !SV.user.phoneVerified) openPhoneVerify(); // 소셜로 막 가입했거나 인증을 미룬 회원
   }
   init().catch((e) => { view.innerHTML = `<div class="wrap"><p class="err">화면을 불러오지 못했어요: ${esc(e.message)}</p></div>`; });
