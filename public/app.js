@@ -28,7 +28,7 @@
     return { users: [], session: null, reservations: [], reviews: [], seq: 100 };
   })();
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch { /* 저장소 사용 불가 */ } };
-  const me = () => DB.users.find((u) => u.email === DB.session) || null;
+  const me = () => (API.on ? SV.user : DB.users.find((u) => u.email === DB.session) || null);
 
   function hash(str) {
     let h = 2166136261;
@@ -93,7 +93,57 @@
   const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, me: null, locating: false, kakao: false, mapStatus: 'loading', regionDone: new Set(), regionTime: new Map(), inflight: new Map(), regionLoading: null, regionError: null, limit: Infinity, adv: false, facMore: false };
   // 실제 데이터로 교체되면서 빠진 샘플 카페도 찾을 수 있게 보관한다 (예약 내역 표시용)
   const archived = [];
-  const cafeById = (id) => D.cafes.find((c) => c.id === Number(id)) || archived.find((c) => c.id === Number(id));
+  const stubs = new Map(); // 서버의 예약 내역에만 나오는 카페(아직 이 지역을 불러오지 않은 경우)
+  const cafeById = (id) => D.cafes.find((c) => c.id === Number(id)) || archived.find((c) => c.id === Number(id)) || stubs.get(Number(id));
+
+  // ---- 서버 연결 ----------------------------------------------------------------------------
+  // 서버(npm start)가 떠 있으면 로그인·예약·후기·포인트를 서버 DB 로 처리하고, 정적 배포(Vercel)에서는 위의 브라우저 저장소로 동작한다.
+  const API = { on: false, token: null, social: {} };
+  const TOKEN_KEY = 'studymoa:token';
+  const SV = { user: null, res: [], taken: new Map(), takenLoading: new Set(), reviews: new Map(), dbId: new Map(), phoneOk: '' };
+  const placeIdOf = (c) => (c.real ? String(c.id) : `sample-${c.id}`); // 서버가 카페를 알아보는 번호 (카카오 장소 번호)
+  const saveToken = (t) => { API.token = t; try { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); } catch { /* 저장소 사용 불가 */ } };
+  async function api(method, path, body) {
+    const r = await fetch(path, { method, headers: { 'content-type': 'application/json', ...(API.token ? { authorization: `Bearer ${API.token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    let d = null; try { d = await r.json(); } catch { /* 본문 없음 */ }
+    if (r.status === 401 && API.token) { saveToken(null); SV.user = null; SV.res = []; renderUser(); } // 서버가 다시 켜지면 로그인이 풀린다
+    if (!r.ok) { const e = new Error((d && d.error) || '요청에 실패했어요. 잠시 뒤 다시 시도해 주세요.'); e.status = r.status; e.data = d || {}; throw e; }
+    return d;
+  }
+  const setUser = (d) => { SV.user = { email: d.email, name: d.name, points: d.points, phoneVerified: d.phoneVerified !== false }; };
+  async function detectServer() {
+    try {
+      const r = await fetch('/api/config', { cache: 'no-store' });
+      if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) return;
+      const d = await r.json();
+      if (!d || d.server !== true) return;
+      API.on = true; API.social = d.social || {};
+      try { API.token = localStorage.getItem(TOKEN_KEY); } catch { /* 저장소 사용 불가 */ }
+      if (API.token) { try { setUser(await api('GET', '/api/me')); } catch { saveToken(null); } }
+    } catch { /* 서버 없는 정적 배포 */ }
+  }
+  // 서버 예약 내역을 화면이 쓰는 모양(저장소 모드의 예약과 같은 필드)으로 바꾼다
+  function mapRes(x) {
+    const sample = /^sample-(\d+)$/.exec(x.kakao_place_id || '');
+    const cid = sample ? Number(sample[1]) : Number(x.kakao_place_id);
+    if (!sample && !cafeById(cid)) { // 이 지역을 아직 불러오지 않았어도 예약 내역에 카페 이름이 보이게 한다
+      stubs.set(cid, fromPlace({ id: cid, place_name: x.cafe_name, road_address_name: x.address, address_name: x.address, y: x.latitude, x: x.longitude, phone: x.phone, place_url: x.place_url }, { sido: x.sido, sigungu: x.sigungu }));
+    }
+    const [d, t] = x.start_at.split(' '), sh = Number(t.slice(0, 2)), n = (x.seat_label.match(/\d+/) || ['1'])[0];
+    return { id: x.reservation_id, email: SV.user.email, cafeId: cid, type: x.seat_type, seat: ({ NORMAL: 'N', FOCUS: 'F', ROOM: 'R' }[x.seat_type]) + n, mode: x.mode, plan: x.plan, date: d,
+      start: x.mode === 'HOURLY' ? sh : 0, end: x.mode === 'HOURLY' ? sh + x.hours : 0, price: x.total_price, method: x.pay_method, status: x.status, refund: x.refund_amount || 0, reviewed: x.reviewed };
+  }
+  async function loadMyRes() {
+    if (!API.on || !SV.user) return;
+    try { SV.res = (await api('GET', '/api/me/reservations')).map(mapRes); } catch { /* 로그인이 풀렸으면 api()가 정리한다 */ }
+  }
+  // 서버에 이 카페가 없으면 등록하고 서버의 카페 번호를 돌려준다 (처음 예약할 때만 저장)
+  async function ensureDbCafe(c) {
+    if (SV.dbId.has(c.id)) return SV.dbId.get(c.id);
+    const d = await api('POST', '/api/cafes/ensure', { placeId: placeIdOf(c), name: c.name, address: c.addr, phone: c.phone, lat: c.lat, lng: c.lng, url: c.url, sido: c.sido, sigungu: c.sigungu, real: !!c.real, seats: c.seats, roomCap: c.roomCap, price: c.price });
+    SV.dbId.set(c.id, d.cafeId);
+    return d.cafeId;
+  }
 
   // 이용 형태·좌석 유형의 실제 적용값 (2인 이상은 스터디룸, 룸은 시간제만)
   const effSeat = () => (S.q.people > 1 ? 'ROOM' : S.q.seat === 'ANY' ? 'NORMAL' : S.q.seat);
@@ -155,15 +205,35 @@
     const [a, b] = iv(o);
     return DB.reservations.some((r) => r.cafeId === c.id && r.seat === key && r.id !== skipId && r.status !== 'CANCELED' && (() => { const [x, y] = iv(r); return a < y && x < b; })());
   };
+  const seatLabel = (key, type) => (type === 'ROOM' ? `스터디룸 ${key.slice(1)}` : `${SEAT[type]} ${key.slice(1)}번`);
+  // 서버 모드: 서버가 알려 준 '이 시간에 예약된 좌석' 만 사용 중으로 본다 (가짜 점유는 쓰지 않는다)
+  const takenKey = (c, type, o, skipId) => `${c.id}|${type}|${o.mode}|${o.date}|${o.mode === 'HOURLY' ? `${o.start}-${o.end}` : o.plan}|${skipId || 0}`;
+  function ensureTaken(c, type, o, skipId, done) {
+    const k = takenKey(c, type, o, skipId);
+    if (SV.taken.has(k) || SV.takenLoading.has(k)) return;
+    SV.takenLoading.add(k);
+    const qs = new URLSearchParams({ type, date: o.date, ...(o.mode === 'HOURLY' ? { start: o.start, end: o.end } : { days: DAYS[o.plan] }), ...(skipId ? { skip: skipId } : {}) });
+    api('GET', `/api/cafes/by-place/${encodeURIComponent(placeIdOf(c))}/taken?${qs}`)
+      .then((d) => { SV.taken.set(k, new Set(d.taken)); })
+      .catch(() => { SV.taken.set(k, new Set()); })
+      .finally(() => { SV.takenLoading.delete(k); if (done) done(); });
+  }
   function avail(c, type, o, skipId) {
     const keys = seatKeys(c, type);
-    const taken = new Set(keys.filter((k) => takenSeed(c, k, o) || takenUser(c, k, o, skipId)));
+    const got = API.on ? SV.taken.get(takenKey(c, type, o, skipId)) : null;
+    const taken = new Set(API.on ? keys.filter((k) => got && got.has(seatLabel(k, type))) : keys.filter((k) => takenSeed(c, k, o) || takenUser(c, k, o, skipId)));
     return { keys, taken, total: keys.length, free: keys.length - taken.size };
   }
-  const seatLabel = (key, type) => (type === 'ROOM' ? `스터디룸 ${key.slice(1)}` : `${SEAT[type]} ${key.slice(1)}번`);
 
   // ---- 후기 ------------------------------------------------------------------------
-  const reviewsOf = (c) => [...DB.reviews.filter((r) => r.cafeId === c.id), ...c.reviews].sort((a, b) => b.date.localeCompare(a.date));
+  const reviewsOf = (c) => [...(API.on ? (SV.reviews.get(c.id) || []) : DB.reviews.filter((r) => r.cafeId === c.id)), ...c.reviews].sort((a, b) => b.date.localeCompare(a.date));
+  async function loadReviews(c) { // 서버 모드: 이 카페의 실제 후기를 불러와 후기 영역만 다시 그린다
+    try {
+      const rows = await api('GET', `/api/cafes/by-place/${encodeURIComponent(placeIdOf(c))}/reviews`);
+      SV.reviews.set(c.id, rows.map((x, i) => ({ id: `s${i}`, cafeId: c.id, name: maskName(x.member_name), rating: x.rating, text: x.content || '', date: x.date })));
+      const el = $('#sec-rev'); if (el && S.book && S.book.cafeId === c.id) el.innerHTML = `<h2>${ico('book', 20)}이용 후기</h2>${reviewBlock(c)}`;
+    } catch { /* 후기를 못 불러와도 상세는 보인다 */ }
+  }
   const ratingOf = (c) => { const l = reviewsOf(c); return { avg: l.length ? l.reduce((s, r) => s + r.rating, 0) / l.length : 0, n: l.length }; };
   const starsHtml = (n) => `<span class="stars" aria-label="별점 ${n}점">${'★'.repeat(Math.round(n))}<span class="off">${'★'.repeat(5 - Math.round(n))}</span></span>`;
   const maskName = (n) => (n.length >= 3 ? n[0] + '*'.repeat(n.length - 2) + n[n.length - 1] : n[0] + '*');
@@ -767,6 +837,7 @@
       <aside><div class="bookcard" id="bookbox"></div></aside></div></div>`;
     drawMap($('#miniMap'), [{ c, p: price(c, 'NORMAL', 'HOURLY'), diff: 0 }], null, c.id, true);
     refreshBook();
+    if (API.on) loadReviews(c);
     window.scrollTo(0, 0);
     void q;
   }
@@ -796,8 +867,9 @@
     const b = S.book, box = $('#seatbox'), c = cafeById(b.cafeId);
     if (!box) return;
     const av = avail(c, b.type, b);
+    if (API.on) ensureTaken(c, b.type, b, 0, () => { if (S.book === b) refreshBook(); }); // 서버에서 받아오면 다시 그린다
     if (b.seat && av.taken.has(b.seat)) b.seat = null;
-    const when = `${fmtDate(b.date)} ${b.mode === 'HOURLY' ? `${hh(b.start)}–${hh(b.end)}` : `${PLAN[b.plan]} 시작`}`;
+    const when =`${fmtDate(b.date)} ${b.mode === 'HOURLY' ? `${hh(b.start)}–${hh(b.end)}` : `${PLAN[b.plan]} 시작`}`;
     box.innerHTML = `<div class="seatstat"><div><div class="big">${SEAT[b.type]} ${av.free}/${av.total}석 이용 가능</div><div class="muted" style="font-size:13px">${esc(when)} 기준</div></div>
       <div class="legend"><span><i class="f"></i>예약 가능</span><span><i class="t"></i>사용 중</span><span><i class="s"></i>선택</span></div></div>
       <div class="seatmap"><div class="screen">${b.type === 'ROOM' ? 'ROOMS' : 'ENTRANCE'}</div>
@@ -852,6 +924,7 @@
     const method = ($('input[name=method]:checked') || {}).value || 'CARD';
     if (method === 'POINT' && u.points < total) { $('#payErr').textContent = '포인트가 부족해요. 다른 결제 수단을 선택해 주세요.'; return; }
     const btn = $('#payBtn'); btn.disabled = true; btn.textContent = '결제 처리 중…';
+    if (API.on) { payGoServer(c, b, total, method, btn); return; }
     setTimeout(() => {
       if (takenSeed(c, b.seat, b) || takenUser(c, b.seat, b)) {
         $('#payErr').textContent = '방금 다른 분이 이 좌석을 예약했어요. 좌석을 다시 선택해 주세요.';
@@ -862,14 +935,36 @@
       DB.reservations.push(r);
       if (method === 'POINT') u.points -= total; else u.points += Math.floor(total * 0.01);
       save(); renderUser(); S.book.seat = null;
-      openModal(`<div class="stepdots"><i class="on"></i><i class="on"></i></div><div class="receipt"><div class="big-check">${ico('check', 34)}</div><h2>예약이 완료됐어요</h2>
+      showReceipt(r, c, method, total);
+      refreshBook();
+    }, 700);
+  }
+  function showReceipt(r, c, method, total) {
+    openModal(`<div class="stepdots"><i class="on"></i><i class="on"></i></div><div class="receipt"><div class="big-check">${ico('check', 34)}</div><h2>예약이 완료됐어요</h2>
         <p class="muted">예약번호 SM-${String(r.id).padStart(6, '0')}</p>
         <div class="sumrows" style="text-align:left"><div><span class="muted">스터디카페</span><b>${esc(c.name)}</b></div><div><span class="muted">좌석</span><span>${seatLabel(r.seat, r.type)}</span></div>
           <div><span class="muted">이용 일시</span><span>${fmtDate(r.date)} ${r.mode === 'HOURLY' ? `${hh(r.start)}–${hh(r.end)}` : PLAN[r.plan]}</span></div><div><span class="muted">결제 수단</span><span>${METHOD[method]}</span></div>
           <div class="total"><span>결제 금액</span><span>${won(total)}</span></div></div>
         <div style="display:flex;gap:8px;margin-top:16px;justify-content:center"><button class="btn" data-act="closeModal">계속 둘러보기</button><button class="btn primary" data-act="toRes">내 예약 보기</button></div></div>`);
+  }
+  // 서버 모드: 카페를 서버에 등록(처음이면)하고 예약·결제를 서버 DB 에 저장한다. 이중 예약은 서버가 막는다.
+  async function payGoServer(c, b, total, method, btn) {
+    const reset = () => { btn.disabled = false; btn.textContent = `${won(total)} 결제하기`; };
+    try {
+      const cafeId = await ensureDbCafe(c);
+      const d = await api('POST', '/api/reservations', { cafeId, seatLabel: seatLabel(b.seat, b.type), mode: b.mode, date: b.date, startHour: b.start, hours: b.end - b.start, plan: b.plan, method });
+      SV.user.points = d.pointBalance; SV.taken.clear();
+      await loadMyRes(); renderUser();
+      const r = SV.res.find((x) => x.id === d.reservationId) || { id: d.reservationId, type: b.type, seat: b.seat, mode: b.mode, plan: b.plan, date: b.date, start: b.start, end: b.end };
+      S.book.seat = null;
+      showReceipt(r, c, method, d.totalPrice);
       refreshBook();
-    }, 700);
+    } catch (e) {
+      if (e.data && e.data.needsPhone) { closeModal(); openPhoneVerify(); return; } // 소셜로 가입했고 휴대폰 인증 전이면 인증부터
+      $('#payErr').textContent = e.status === 409 ? '방금 다른 분이 이 좌석을 예약했어요. 좌석을 다시 선택해 주세요.' : e.message;
+      if (e.status === 409) { SV.taken.clear(); refreshBook(); }
+      reset();
+    }
   }
 
   // =====================================================================================
@@ -881,21 +976,91 @@
       ? `<span class="hello">${esc(u.name)}님</span><span class="pts">${u.points.toLocaleString('ko-KR')}P</span><button class="btn sm" data-act="logout">로그아웃</button>`
       : '<button class="btn sm" data-act="login">로그인</button><button class="btn sm primary" data-act="signup">회원가입</button>';
   }
+  // 서버 모드의 소셜 로그인 버튼 (카카오·네이버). 서버에 키가 설정되지 않았으면 눌러도 안내만 나온다.
+  const socialHtml = () => (API.on ? `<div class="social"><span class="muted" style="font-size:13px">간편하게 시작하기</span>
+      ${[['kakao', '카카오', API.social.KAKAO], ['naver', '네이버', API.social.NAVER]].map(([k, t, on]) => (on
+    ? `<a class="btn" href="/api/auth/${k}/start">${t}로 시작하기</a>`
+    : `<button type="button" class="btn" data-act="socialOff" data-n="${t}">${t}로 시작하기</button>`)).join('')}</div>` : '');
   function openAuth(mode, after) {
     S.pending = after || null;
+    SV.phoneOk = '';
     const signup = mode === 'signup';
     openModal(`<h2>${signup ? '회원가입' : '로그인'}</h2><p class="muted" style="margin:0">${signup ? '가입하면 10,000P를 드려요.' : '로그인하고 예약과 후기를 남겨 보세요.'}</p>
       <form class="form" data-form="${mode}">
         <input id="aEmail" type="email" placeholder="이메일" autocomplete="email" required>
         <input id="aPw" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="${signup ? 'new-password' : 'current-password'}" required minlength="6">
         ${signup ? '<input id="aName" type="text" placeholder="이름" required>' : '<p class="muted" style="margin:0;font-size:13px">데모 계정: demo@example.com / demo1234 <button type="button" class="btn sm" data-act="fillDemo">입력하기</button></p>'}
+        ${signup && API.on ? `<div class="phonerow"><input id="aPhone" type="tel" inputmode="numeric" placeholder="휴대폰 번호 (010-1234-5678)" autocomplete="tel" required><button type="button" class="btn sm" data-act="phoneSend">인증번호 받기</button></div>
+          <div class="phonerow"><input id="aCode" type="text" inputmode="numeric" maxlength="6" placeholder="인증번호 6자리"><button type="button" class="btn sm" data-act="phoneVerify">확인</button></div>
+          <p class="muted" id="phoneMsg" style="margin:0;font-size:13px">한 번호로 한 번만 가입할 수 있어요.</p>` : ''}
         <p class="err" id="authErr"></p>
         <button class="btn primary lg block">${signup ? '가입하기' : '로그인'}</button>
+        ${socialHtml()}
         <p class="muted" style="margin:0;text-align:center;font-size:13px">${signup ? '이미 계정이 있나요?' : '아직 계정이 없나요?'} <button type="button" class="btn sm" data-act="${signup ? 'login' : 'signup'}">${signup ? '로그인' : '회원가입'}</button></p>
       </form>`);
   }
+  // 서버 모드: 소셜로 막 가입해 휴대폰이 없는 회원은 인증을 마쳐야 예약·후기를 쓸 수 있다.
+  // 인증하면 가입 보너스를 받고, 그 번호로 이미 가입한 계정이 있으면 그 계정에 연결된다(기존 계정의 비밀번호 확인).
+  function openPhoneVerify(after) {
+    S.pending = after || null;
+    openModal(`<h2>휴대폰 인증</h2><p class="muted" style="margin:0">예약과 후기를 쓰려면 휴대폰 인증이 필요해요. 인증하면 10,000P를 드려요. 이미 이 번호로 가입한 계정이 있으면 그 계정과 연결돼요.</p>
+      <form class="form" data-form="phone">
+        <div class="phonerow"><input id="pvPhone" type="tel" inputmode="numeric" placeholder="휴대폰 번호 (010-1234-5678)" autocomplete="tel" required><button type="button" class="btn sm" data-act="pvSend">인증번호 받기</button></div>
+        <div class="phonerow"><input id="pvCode" type="text" inputmode="numeric" maxlength="6" placeholder="인증번호 6자리"><button type="button" class="btn sm" data-act="pvVerify">인증하기</button></div>
+        <input id="pvPw" type="password" placeholder="기존 계정 비밀번호" autocomplete="current-password" hidden>
+        <p class="muted" id="pvMsg" style="margin:0;font-size:13px">한 번호로 한 번만 가입할 수 있어요.</p>
+        <p class="err" id="pvErr"></p>
+      </form>`);
+  }
+  async function pvSend() {
+    const msg = $('#pvMsg'), err = $('#pvErr'); err.textContent = '';
+    try {
+      const d = await api('POST', '/api/me/phone/send', { phone: $('#pvPhone').value });
+      const pw = $('#pvPw'); pw.hidden = !d.needsPassword;
+      msg.textContent = d.existing
+        ? (d.needsPassword ? '이미 가입된 번호예요. 인증번호와 함께 그 계정의 비밀번호를 입력하면 소셜 계정이 연결돼요.' : '소셜 로그인으로만 가입한 계정의 번호예요. 지금은 연결할 수 없어요.')
+        : (d.mock ? `인증번호를 보냈어요. (모의 발송: 실제 문자는 가지 않아요. 인증번호 ${d.devCode}) 5분 안에 입력해 주세요.` : '인증번호를 보냈어요. 5분 안에 입력해 주세요.');
+      if (d.existing && d.mock) msg.textContent += ` (모의 발송 인증번호 ${d.devCode})`;
+      const c = $('#pvCode'); if (c) c.focus();
+    } catch (e) { err.textContent = e.message; }
+  }
+  async function pvVerify() {
+    const err = $('#pvErr'); err.textContent = '';
+    try {
+      const d = await api('POST', '/api/me/phone/verify', { phone: $('#pvPhone').value, code: $('#pvCode').value, password: $('#pvPw').value });
+      setUser(d); SV.taken.clear(); await loadMyRes(); renderUser(); closeModal();
+      toast(d.merged ? '기존 계정에 소셜 계정을 연결했어요.' : '휴대폰 인증이 완료됐어요. 10,000P가 적립됐어요.');
+      const next = S.pending; S.pending = null;
+      if (next) next(); else route();
+    } catch (e) {
+      if (e.data && e.data.needsPassword) $('#pvPw').hidden = false;
+      err.textContent = e.message;
+    }
+  }
+  // 서버 모드: 서버가 가입(휴대폰 인증·중복 확인)과 로그인을 처리한다
+  async function submitAuthServer(mode, email, pw, err) {
+    const digits = (s) => String(s || '').replace(/\D/g, '');
+    try {
+      let d;
+      if (mode === 'signup') {
+        const name = $('#aName').value.trim(), phone = digits($('#aPhone').value);
+        if (!/^\S+@\S+\.\S+$/.test(email)) { err.textContent = '이메일 형식을 확인해 주세요.'; return; }
+        if (pw.length < 6) { err.textContent = '비밀번호는 6자 이상이어야 해요.'; return; }
+        if (SV.phoneOk !== phone || !phone) { err.textContent = '휴대폰 인증을 먼저 완료해 주세요.'; return; }
+        d = await api('POST', '/api/signup', { email, password: pw, name, phone });
+      } else d = await api('POST', '/api/login', { email, password: pw });
+      saveToken(d.token); setUser(d); SV.taken.clear();
+      await loadMyRes();
+    } catch (e) { err.textContent = e.message; return; }
+    renderUser(); closeModal();
+    toast(mode === 'signup' ? '가입이 완료됐어요. 10,000P가 적립됐어요.' : `${me().name}님, 환영해요.`);
+    const next = S.pending; S.pending = null;
+    if (SV.user && !SV.user.phoneVerified) { openPhoneVerify(next); return; }
+    if (next) next(); else route();
+  }
   async function submitAuth(mode) {
     const email = $('#aEmail').value.trim().toLowerCase(), pw = $('#aPw').value, err = $('#authErr');
+    if (API.on) return submitAuthServer(mode, email, pw, err);
     if (mode === 'signup') {
       const name = $('#aName').value.trim();
       if (!/^\S+@\S+\.\S+$/.test(email)) { err.textContent = '이메일 형식을 확인해 주세요.'; return; }
@@ -944,7 +1109,7 @@
       view.innerHTML = `${head}<div class="empty" style="margin-bottom:40px"><h3>로그인이 필요해요</h3><p class="muted">로그인하면 예약 내역을 볼 수 있어요.</p><button class="btn primary" data-act="login">로그인</button></div></div>`;
       S.pending = showReservations; window.scrollTo(0, 0); return;
     }
-    const all = DB.reservations.filter((r) => r.email === u.email).map((r) => ({ r, s: statusOf(r) }));
+    const all = (API.on ? SV.res : DB.reservations.filter((r) => r.email === u.email)).map((r) => ({ r, s: statusOf(r) }));
     const tabs = [['UP', '예정·이용 중', (x) => x.s === 'UPCOMING' || x.s === 'ACTIVE'], ['DONE', '이용 완료', (x) => x.s === 'COMPLETED'], ['CANC', '취소', (x) => x.s === 'CANCELED']];
     const cur = tabs.find((t) => t[0] === S.resTab) || tabs[0];
     const list = all.filter(cur[2]).sort((a, b) => (cur[0] === 'UP' ? iv(a.r)[0] - iv(b.r)[0] : iv(b.r)[0] - iv(a.r)[0]));
@@ -967,7 +1132,7 @@
       <div class="ractions">${acts.join('')}</div>
       ${S.cancelId === r.id ? `<div class="cancelbox"><span>취소하면 <b>${won(f.amount)}</b>(${Math.round(f.pct * 100)}%)이 환불돼요.</span><span style="display:flex;gap:6px"><button class="btn sm" data-act="cancelNo">유지하기</button><button class="btn sm danger" data-act="cancelGo" data-id="${r.id}">예약 취소하기</button></span></div>` : ''}</div>`;
   }
-  const resById = (id) => DB.reservations.find((r) => r.id === Number(id));
+  const resById = (id) => (API.on ? SV.res : DB.reservations).find((r) => r.id === Number(id));
 
   function openChange(r) {
     const c = cafeById(r.cafeId);
@@ -982,6 +1147,16 @@
     const r = resById(id), c = cafeById(r.cafeId);
     const o = { ...r, date: $('#cDate').value };
     if (r.mode === 'HOURLY') { o.start = Number($('#cStart').value); o.end = Number($('#cEnd').value); }
+    if (API.on) { // 서버 모드: 새 시간이 비어 있는지는 서버가 확인한다 (겹치면 변경되지 않는다)
+      const e0 = timeError(c, o);
+      if (e0) { $('#chErr').textContent = e0; return; }
+      api('PUT', `/api/reservations/${r.id}`, { date: o.date, startHour: o.start, hours: o.end - o.start }).then(async (d) => {
+        if (d.pointBalance != null && SV.user) SV.user.points = d.pointBalance;
+        SV.taken.clear(); await loadMyRes(); renderUser(); closeModal(); showReservations();
+        toast(d.diff === 0 ? '예약을 변경했어요.' : `예약을 변경했어요. 차액 ${won(Math.abs(d.diff))}${d.diff > 0 ? ' 추가 결제' : ' 환불'} 예정이에요.`);
+      }).catch((e) => { $('#chErr').textContent = e.status === 409 ? '그 시간에는 이미 사용 중인 좌석이에요. 다른 시간을 선택해 주세요.' : e.message; });
+      return;
+    }
     const err = timeError(c, o) || ((takenSeed(c, r.seat, o) || takenUser(c, r.seat, o, r.id)) ? '그 시간에는 이미 사용 중인 좌석이에요. 다른 시간을 선택해 주세요.' : '');
     if (err) { $('#chErr').textContent = err; return; }
     const newPrice = r.mode === 'HOURLY' ? price(c, r.type, 'HOURLY') * (o.end - o.start) : r.price, diff = newPrice - r.price;
@@ -999,6 +1174,12 @@
   function submitReview(id) {
     const r = resById(id), u = me(), text = $('#rText').value.trim();
     if (text.length < 5) { $('#rErr').textContent = '후기를 5자 이상 적어 주세요.'; return; }
+    if (API.on) {
+      api('POST', '/api/reviews', { reservationId: r.id, rating: S.star, content: text }).then(async () => {
+        SV.reviews.delete(r.cafeId); await loadMyRes(); closeModal(); showReservations(); toast('후기를 등록했어요. 감사합니다.');
+      }).catch((e) => { $('#rErr').textContent = e.message; });
+      return;
+    }
     DB.reviews.push({ id: DB.seq++, cafeId: r.cafeId, email: u.email, name: maskName(u.name), rating: S.star, text, date: todayStr() });
     r.reviewed = true; save(); closeModal(); showReservations(); toast('후기를 등록했어요. 감사합니다.');
   }
@@ -1085,17 +1266,49 @@
     toRes: () => { closeModal(); location.hash = 'reservations'; },
     login: () => openAuth('login', S.pending), signup: () => openAuth('signup', S.pending),
     fillDemo: () => { $('#aEmail').value = 'demo@example.com'; $('#aPw').value = 'demo1234'; },
-    logout: () => { DB.session = null; save(); renderUser(); route(); toast('로그아웃했어요.'); },
+    logout: () => {
+      if (API.on) { saveToken(null); SV.user = null; SV.res = []; SV.taken.clear(); } else { DB.session = null; save(); }
+      renderUser(); route(); toast('로그아웃했어요.');
+    },
+    phoneSend: async () => { // 서버 모드: 휴대폰 인증번호 요청. 실제 문자 업체가 없어서 모의 인증번호를 화면에 보여 준다.
+      const msg = $('#phoneMsg'), phone = $('#aPhone').value;
+      try {
+        const d = await api('POST', '/api/phone/send', { phone });
+        SV.phoneOk = '';
+        msg.textContent = d.mock ? `인증번호를 보냈어요. (모의 발송: 실제 문자는 가지 않아요. 인증번호 ${d.devCode}) 5분 안에 입력해 주세요.` : '인증번호를 보냈어요. 5분 안에 입력해 주세요.';
+        const c = $('#aCode'); if (c) c.focus();
+      } catch (e) { msg.textContent = e.message; }
+    },
+    phoneVerify: async () => {
+      const msg = $('#phoneMsg'), phone = $('#aPhone').value, digits = phone.replace(/\D/g, '');
+      try {
+        await api('POST', '/api/phone/verify', { phone, code: $('#aCode').value });
+        SV.phoneOk = digits; msg.textContent = '휴대폰 인증이 완료됐어요.';
+      } catch (e) { msg.textContent = e.message; }
+    },
+    pvSend, pvVerify,
+    socialOff: (t) => toast(`${t.dataset.n} 로그인은 서버에 키가 아직 설정되지 않았어요.`),
     resTab: (t) => { S.resTab = t.dataset.v; S.cancelId = null; showReservations(); },
     change: (t) => openChange(resById(t.dataset.id)),
     cancelAsk: (t) => { S.cancelId = Number(t.dataset.id); showReservations(); },
     cancelNo: () => { S.cancelId = null; showReservations(); },
     cancelGo: (t) => {
+      if (API.on) { // 서버가 환불 규정대로 환불액을 계산해 처리한다
+        api('POST', `/api/reservations/${t.dataset.id}/cancel`).then(async (d) => {
+          if (SV.user) SV.user.points = d.pointBalance;
+          S.cancelId = null; SV.taken.clear(); await loadMyRes(); renderUser(); showReservations(); toast(`예약을 취소했어요. ${won(d.refund)}이 환불돼요.`);
+        }).catch((e) => toast(e.message));
+        return;
+      }
       const r = resById(t.dataset.id), f = refundOf(r), u = me();
       r.status = 'CANCELED'; r.refund = f.amount; if (r.method === 'POINT') u.points += f.amount;
       S.cancelId = null; save(); renderUser(); showReservations(); toast(`예약을 취소했어요. ${won(f.amount)}이 환불돼요.`);
     },
-    complete: (t) => { resById(t.dataset.id).status = 'COMPLETED'; save(); S.resTab = 'DONE'; showReservations(); toast('이용 완료로 표시했어요. 후기를 남겨 보세요.'); },
+    complete: (t) => {
+      const done = () => { S.resTab = 'DONE'; showReservations(); toast('이용 완료로 표시했어요. 후기를 남겨 보세요.'); };
+      if (API.on) { api('POST', `/api/reservations/${t.dataset.id}/complete`).then(() => loadMyRes()).then(done).catch((e) => toast(e.message)); return; }
+      resById(t.dataset.id).status = 'COMPLETED'; save(); done();
+    },
     review: (t) => openReview(resById(t.dataset.id)),
     star: (t) => { S.star = Number(t.dataset.v); document.querySelectorAll('#starpick button').forEach((b, i) => b.classList.toggle('on', i < S.star)); },
   };
@@ -1114,6 +1327,7 @@
     if (k === 'login' || k === 'signup') submitAuth(k);
     else if (k === 'change') submitChange(f.dataset.id);
     else if (k === 'review') submitReview(f.dataset.id);
+    else if (k === 'phone') pvVerify();
   });
   document.addEventListener('change', (e) => {
     const t = e.target;
@@ -1145,7 +1359,7 @@
     const h = location.hash.replace('#', '');
     view.classList.remove('enter'); void view.offsetWidth; view.classList.add('enter'); // 화면이 바뀔 때 부드럽게 나타난다
     if (h.startsWith('cafe-')) showCafe(Number(h.slice(5)));
-    else if (h === 'reservations') showReservations();
+    else if (h === 'reservations') { if (API.on && me()) loadMyRes().finally(showReservations); else showReservations(); } // 서버 모드는 최신 예약을 불러온 뒤 그린다
     else { showHome(); window.scrollTo(0, 0); }
   }
   window.addEventListener('hashchange', () => { closeModal(); route(); });
@@ -1153,7 +1367,18 @@
   async function init() {
     $('#logoMark').innerHTML = ico('book', 20);
     $('#logoMark2').innerHTML = ico('book', 20);
-    await seedDemo();
+    await detectServer(); // 서버가 있으면 서버 DB 모드, 없으면(정적 배포) 브라우저 저장소 모드
+    if (!API.on) await seedDemo();
+    // 소셜 로그인을 마치고 돌아온 경우: 1회용 티켓을 로그인 토큰으로 바꾼다
+    const hash0 = location.hash;
+    if (API.on && hash0.startsWith('#social=')) {
+      history.replaceState(null, '', location.pathname + location.search);
+      try { const d = await api('POST', '/api/auth/exchange', { ticket: hash0.slice(8) }); saveToken(d.token); setUser(d); toast(`${d.name}님, 환영해요.`); } catch (e) { toast(e.message); }
+    } else if (hash0.startsWith('#login-error=')) {
+      history.replaceState(null, '', location.pathname + location.search);
+      toast(decodeURIComponent(hash0.slice(13)));
+    }
+    if (API.on && SV.user) await loadMyRes();
     renderUser();
     const ra = $('#regAsof'); if (ra) ra.textContent = window.SC_REGIONS_ASOF || '';
     try { Object.keys(localStorage).filter((k) => /^studymoa:r:v[123]:|^studymoa:real:/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch { /* 저장소 사용 불가 */ } // 쓰지 않는 옛 저장본 정리
@@ -1164,6 +1389,7 @@
     watchLocationPermission();
     initKakao();
     route();
+    if (API.on && SV.user && !SV.user.phoneVerified) openPhoneVerify(); // 소셜로 막 가입했거나 인증을 미룬 회원
   }
   init().catch((e) => { view.innerHTML = `<div class="wrap"><p class="err">화면을 불러오지 못했어요: ${esc(e.message)}</p></div>`; });
 })();

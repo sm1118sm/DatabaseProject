@@ -1,5 +1,5 @@
--- 스터디카페 통합 예약 및 비교 플랫폼 스키마 (MySQL 8.0+)
--- 실행: mysql -u root -p < db/schema.sql
+-- 스터디모아 스키마 v2 (MySQL 8.0+) — ERD: db/ERD.md
+-- 실행: npm run db:init -- --force   (studycafe DB 를 지우고 다시 만든다)
 
 DROP DATABASE IF EXISTS studycafe;
 CREATE DATABASE studycafe
@@ -11,25 +11,55 @@ USE studycafe;
 CREATE TABLE member (
   member_id     BIGINT       NOT NULL AUTO_INCREMENT,
   email         VARCHAR(100) NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
+  password_hash VARCHAR(255),                 -- 소셜 로그인으로만 가입한 회원은 NULL
   name          VARCHAR(50)  NOT NULL,
-  phone         VARCHAR(20),
+  phone         VARCHAR(20),                  -- 숫자만 저장(01012345678). 한 번호로 한 번만 가입
+  phone_verified BOOLEAN     NOT NULL DEFAULT FALSE,
   role          ENUM('USER','OWNER','ADMIN') NOT NULL DEFAULT 'USER',
+  point_balance INT          NOT NULL DEFAULT 0,
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (member_id),
-  UNIQUE KEY uq_member_email (email)
+  UNIQUE KEY uq_member_email (email),
+  UNIQUE KEY uq_member_phone (phone),
+  CONSTRAINT ck_member_point CHECK (point_balance >= 0)
 ) ENGINE=InnoDB;
 
--- 지역 (시·도 / 시·군·구). 구 단위 평균 비교의 기준 테이블
+-- 소셜 로그인 연결 (카카오·네이버). 같은 소셜 계정은 한 회원에만 연결된다.
+CREATE TABLE member_social (
+  provider         ENUM('KAKAO','NAVER') NOT NULL,
+  provider_user_id VARCHAR(64) NOT NULL,
+  member_id        BIGINT      NOT NULL,
+  linked_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (provider, provider_user_id),
+  UNIQUE KEY uq_social_member (member_id, provider),
+  CONSTRAINT fk_social_member FOREIGN KEY (member_id) REFERENCES member (member_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- 휴대폰 인증 요청 (문자 인증번호). 코드는 해시로만 저장하고 만료·시도 횟수를 제한한다.
+CREATE TABLE phone_verification (
+  verify_id   BIGINT      NOT NULL AUTO_INCREMENT,
+  phone       VARCHAR(20) NOT NULL,
+  code_hash   VARCHAR(64) NOT NULL,
+  attempts    TINYINT     NOT NULL DEFAULT 0,
+  expires_at  DATETIME    NOT NULL,
+  verified_at DATETIME,
+  created_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (verify_id),
+  KEY idx_pv_phone (phone, created_at)
+) ENGINE=InnoDB;
+
+-- 지역 (시·도 / 시·군·구). 세종은 시·군·구가 없어 sigungu 에 시·도 이름을 넣는다.
 CREATE TABLE region (
-  region_id BIGINT      NOT NULL AUTO_INCREMENT,
-  sido      VARCHAR(20) NOT NULL,
-  sigungu   VARCHAR(30) NOT NULL,
+  region_id  BIGINT        NOT NULL AUTO_INCREMENT,
+  sido       VARCHAR(20)   NOT NULL,
+  sigungu    VARCHAR(30)   NOT NULL,
+  center_lat DECIMAL(10,7),
+  center_lng DECIMAL(10,7),
   PRIMARY KEY (region_id),
   UNIQUE KEY uq_region (sido, sigungu)
 ) ENGINE=InnoDB;
 
--- 스터디카페 (카카오 로컬 API 장소 정보 기반)
+-- 스터디카페. 이름·주소·전화·좌표·링크는 카카오 장소 검색 정보이고 요금·좌석·시설은 카카오가 주지 않는다.
 CREATE TABLE cafe (
   cafe_id        BIGINT        NOT NULL AUTO_INCREMENT,
   kakao_place_id VARCHAR(30),
@@ -40,8 +70,12 @@ CREATE TABLE cafe (
   phone          VARCHAR(20),
   latitude       DECIMAL(10,7) NOT NULL,
   longitude      DECIMAL(10,7) NOT NULL,
+  place_url      VARCHAR(200),
   open_time      TIME          NOT NULL DEFAULT '00:00:00',
   close_time     TIME          NOT NULL DEFAULT '23:59:59',
+  info_source    ENUM('KAKAO','OWNER','MANUAL') NOT NULL DEFAULT 'KAKAO',
+  fetched_at     DATETIME,
+  is_active      BOOLEAN       NOT NULL DEFAULT TRUE,
   created_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (cafe_id),
   UNIQUE KEY uq_cafe_kakao (kakao_place_id),
@@ -50,61 +84,96 @@ CREATE TABLE cafe (
   CONSTRAINT fk_cafe_region FOREIGN KEY (region_id) REFERENCES region (region_id)
 ) ENGINE=InnoDB;
 
--- 좌석/룸 (예약 단위)
-CREATE TABLE room (
-  room_id   BIGINT      NOT NULL AUTO_INCREMENT,
-  cafe_id   BIGINT      NOT NULL,
-  name      VARCHAR(50) NOT NULL,
-  room_type ENUM('SEAT','ROOM') NOT NULL DEFAULT 'SEAT',
-  capacity  INT         NOT NULL DEFAULT 1,
-  PRIMARY KEY (room_id),
-  UNIQUE KEY uq_room_name (cafe_id, name),
-  CONSTRAINT fk_room_cafe FOREIGN KEY (cafe_id) REFERENCES cafe (cafe_id) ON DELETE CASCADE,
-  CONSTRAINT ck_room_capacity CHECK (capacity > 0)
+-- 시설 종류 (스낵바·프린터 등) 와 카페별 보유 시설
+CREATE TABLE facility (
+  facility_id TINYINT     NOT NULL AUTO_INCREMENT,
+  code        VARCHAR(20) NOT NULL,
+  name        VARCHAR(30) NOT NULL,
+  PRIMARY KEY (facility_id),
+  UNIQUE KEY uq_facility_code (code)
 ) ENGINE=InnoDB;
 
--- 요금제 (카페 × 좌석유형 × 이용권종류). 시간당 요금 비교는 HOURLY 기준
+CREATE TABLE cafe_facility (
+  cafe_id     BIGINT  NOT NULL,
+  facility_id TINYINT NOT NULL,
+  PRIMARY KEY (cafe_id, facility_id),
+  CONSTRAINT fk_cf_cafe     FOREIGN KEY (cafe_id)     REFERENCES cafe (cafe_id) ON DELETE CASCADE,
+  CONSTRAINT fk_cf_facility FOREIGN KEY (facility_id) REFERENCES facility (facility_id)
+) ENGINE=InnoDB;
+
+-- 좌석 유형 (일반석·집중석·스터디룸)
+CREATE TABLE seat_type (
+  seat_type_id TINYINT     NOT NULL AUTO_INCREMENT,
+  code         VARCHAR(20) NOT NULL,
+  name         VARCHAR(30) NOT NULL,
+  is_room      BOOLEAN     NOT NULL DEFAULT FALSE,
+  PRIMARY KEY (seat_type_id),
+  UNIQUE KEY uq_seat_type_code (code)
+) ENGINE=InnoDB;
+
+-- 좌석/룸 (예약 단위, 한 행이 좌석 하나)
+CREATE TABLE seat (
+  seat_id      BIGINT      NOT NULL AUTO_INCREMENT,
+  cafe_id      BIGINT      NOT NULL,
+  seat_type_id TINYINT     NOT NULL,
+  label        VARCHAR(50) NOT NULL,
+  capacity     INT         NOT NULL DEFAULT 1,
+  PRIMARY KEY (seat_id),
+  UNIQUE KEY uq_seat_label (cafe_id, label),
+  KEY idx_seat_type (seat_type_id),
+  CONSTRAINT fk_seat_cafe FOREIGN KEY (cafe_id)      REFERENCES cafe (cafe_id) ON DELETE CASCADE,
+  CONSTRAINT fk_seat_type FOREIGN KEY (seat_type_id) REFERENCES seat_type (seat_type_id),
+  CONSTRAINT ck_seat_capacity CHECK (capacity > 0)
+) ENGINE=InnoDB;
+
+-- 요금제 (카페 × 좌석유형 × 이용권종류). 시간당 요금 비교는 HOURLY 기준.
+-- price_source: EXAMPLE = 화면에 '예시'로 표시하는 가상 값, VERIFIED = 사람이 직접 확인한 값(출처·확인일 필수)
 CREATE TABLE price_plan (
-  plan_id   BIGINT NOT NULL AUTO_INCREMENT,
-  cafe_id   BIGINT NOT NULL,
-  room_type ENUM('SEAT','ROOM') NOT NULL,
-  plan_type ENUM('HOURLY','DAILY','WEEKLY','MONTHLY') NOT NULL,
-  price     INT    NOT NULL,
+  plan_id      BIGINT       NOT NULL AUTO_INCREMENT,
+  cafe_id      BIGINT       NOT NULL,
+  seat_type_id TINYINT      NOT NULL,
+  plan_type    ENUM('HOURLY','DAILY','WEEKLY','MONTHLY') NOT NULL,
+  price        INT          NOT NULL,
+  price_source ENUM('EXAMPLE','VERIFIED') NOT NULL DEFAULT 'EXAMPLE',
+  source_note  VARCHAR(200),
+  verified_at  DATE,
   PRIMARY KEY (plan_id),
-  UNIQUE KEY uq_price_plan (cafe_id, room_type, plan_type),
-  CONSTRAINT fk_plan_cafe FOREIGN KEY (cafe_id) REFERENCES cafe (cafe_id) ON DELETE CASCADE,
-  CONSTRAINT ck_plan_price CHECK (price >= 0)
+  UNIQUE KEY uq_price_plan (cafe_id, seat_type_id, plan_type),
+  CONSTRAINT fk_plan_cafe FOREIGN KEY (cafe_id)      REFERENCES cafe (cafe_id) ON DELETE CASCADE,
+  CONSTRAINT fk_plan_type FOREIGN KEY (seat_type_id) REFERENCES seat_type (seat_type_id),
+  CONSTRAINT ck_plan_price CHECK (price >= 0),
+  CONSTRAINT ck_plan_verified CHECK (price_source = 'EXAMPLE' OR (source_note IS NOT NULL AND verified_at IS NOT NULL))
 ) ENGINE=InnoDB;
 
--- 예약
+-- 예약 (사이트는 예약 즉시 확정이라 PENDING 상태는 쓰지 않는다)
 CREATE TABLE reservation (
   reservation_id BIGINT   NOT NULL AUTO_INCREMENT,
   member_id      BIGINT   NOT NULL,
-  room_id        BIGINT   NOT NULL,
+  seat_id        BIGINT   NOT NULL,
   start_at       DATETIME NOT NULL,
   end_at         DATETIME NOT NULL,
-  status         ENUM('PENDING','CONFIRMED','CANCELED','COMPLETED','NO_SHOW') NOT NULL DEFAULT 'PENDING',
+  status         ENUM('CONFIRMED','CANCELED','COMPLETED','NO_SHOW') NOT NULL DEFAULT 'CONFIRMED',
   total_price    INT      NOT NULL,
   created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (reservation_id),
   KEY idx_resv_member (member_id, start_at),
-  KEY idx_resv_room_time (room_id, start_at, end_at),
+  KEY idx_resv_seat_time (seat_id, start_at, end_at),
   CONSTRAINT fk_resv_member FOREIGN KEY (member_id) REFERENCES member (member_id),
-  CONSTRAINT fk_resv_room   FOREIGN KEY (room_id)   REFERENCES room (room_id),
+  CONSTRAINT fk_resv_seat   FOREIGN KEY (seat_id)   REFERENCES seat (seat_id),
   CONSTRAINT ck_resv_time   CHECK (end_at > start_at),
   CONSTRAINT ck_resv_price  CHECK (total_price >= 0)
 ) ENGINE=InnoDB;
 
--- 예약 점유 슬롯 (1시간 단위). (room_id, slot_start) 유일 제약으로
--- 같은 좌석·같은 시간대 이중 예약을 DB 레벨에서 차단한다.
--- 예약 취소/노쇼 시 해당 예약의 슬롯을 삭제해 자리를 반환한다.
+-- 예약 점유 슬롯 (1시간 단위). (seat_id, slot_start) 기본키가 같은 좌석·같은 시간대 이중 예약을 DB 레벨에서 차단한다.
+-- 취소·노쇼 시 해당 예약의 슬롯을 삭제해 자리를 반환한다.
 CREATE TABLE reservation_slot (
-  room_id        BIGINT   NOT NULL,
+  seat_id        BIGINT   NOT NULL,
   slot_start     DATETIME NOT NULL,
   reservation_id BIGINT   NOT NULL,
-  PRIMARY KEY (room_id, slot_start),
+  PRIMARY KEY (seat_id, slot_start),
   KEY idx_slot_resv (reservation_id),
-  CONSTRAINT fk_slot_room FOREIGN KEY (room_id) REFERENCES room (room_id),
+  CONSTRAINT fk_slot_seat FOREIGN KEY (seat_id)        REFERENCES seat (seat_id),
   CONSTRAINT fk_slot_resv FOREIGN KEY (reservation_id) REFERENCES reservation (reservation_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
@@ -113,16 +182,33 @@ CREATE TABLE payment (
   payment_id     BIGINT   NOT NULL AUTO_INCREMENT,
   reservation_id BIGINT   NOT NULL,
   amount         INT      NOT NULL,
-  method         ENUM('CARD','TRANSFER','POINT') NOT NULL,
+  method         ENUM('CARD','TRANSFER','KAKAO','POINT') NOT NULL,
   status         ENUM('PAID','REFUNDED','FAILED') NOT NULL DEFAULT 'PAID',
+  refund_amount  INT,
   paid_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (payment_id),
   UNIQUE KEY uq_payment_resv (reservation_id),
   CONSTRAINT fk_payment_resv FOREIGN KEY (reservation_id) REFERENCES reservation (reservation_id),
-  CONSTRAINT ck_payment_amount CHECK (amount >= 0)
+  CONSTRAINT ck_payment_amount CHECK (amount >= 0),
+  CONSTRAINT ck_payment_refund CHECK (refund_amount IS NULL OR (refund_amount >= 0 AND refund_amount <= amount))
 ) ENGINE=InnoDB;
 
--- 후기 (이용 완료한 예약에 대해 1건)
+-- 포인트 원장 (적립 +, 사용 -). member.point_balance 는 이 합계의 조회용 값
+CREATE TABLE point_ledger (
+  point_id       BIGINT       NOT NULL AUTO_INCREMENT,
+  member_id      BIGINT       NOT NULL,
+  reservation_id BIGINT,
+  delta          INT          NOT NULL,
+  reason         VARCHAR(100) NOT NULL,
+  created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (point_id),
+  KEY idx_point_member (member_id, created_at),
+  CONSTRAINT fk_point_member FOREIGN KEY (member_id)      REFERENCES member (member_id) ON DELETE CASCADE,
+  CONSTRAINT fk_point_resv   FOREIGN KEY (reservation_id) REFERENCES reservation (reservation_id) ON DELETE SET NULL,
+  CONSTRAINT ck_point_delta  CHECK (delta <> 0)
+) ENGINE=InnoDB;
+
+-- 후기 (이용한 예약에 대해 1건)
 CREATE TABLE review (
   review_id      BIGINT   NOT NULL AUTO_INCREMENT,
   member_id      BIGINT   NOT NULL,
@@ -150,19 +236,44 @@ CREATE TABLE favorite (
   CONSTRAINT fk_fav_cafe   FOREIGN KEY (cafe_id)   REFERENCES cafe (cafe_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 뷰: 카페별 시간당 요금과 같은 시·구 평균 대비 차이 (윈도우 함수)
+-- 가까운 역·대학교 (거리 기준점)
+CREATE TABLE landmark (
+  landmark_id BIGINT        NOT NULL AUTO_INCREMENT,
+  region_id   BIGINT        NOT NULL,
+  kind        ENUM('STATION','UNIVERSITY') NOT NULL,
+  name        VARCHAR(60)   NOT NULL,
+  latitude    DECIMAL(10,7) NOT NULL,
+  longitude   DECIMAL(10,7) NOT NULL,
+  PRIMARY KEY (landmark_id),
+  UNIQUE KEY uq_landmark (region_id, kind, name),
+  CONSTRAINT fk_landmark_region FOREIGN KEY (region_id) REFERENCES region (region_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE cafe_landmark (
+  cafe_id     BIGINT NOT NULL,
+  landmark_id BIGINT NOT NULL,
+  distance_m  INT    NOT NULL,
+  PRIMARY KEY (cafe_id, landmark_id),
+  CONSTRAINT fk_cl_cafe     FOREIGN KEY (cafe_id)     REFERENCES cafe (cafe_id) ON DELETE CASCADE,
+  CONSTRAINT fk_cl_landmark FOREIGN KEY (landmark_id) REFERENCES landmark (landmark_id) ON DELETE CASCADE,
+  CONSTRAINT ck_cl_distance CHECK (distance_m >= 0)
+) ENGINE=InnoDB;
+
+-- 뷰: 카페별 시간당 요금과 같은 시·구 평균 대비 차이 (윈도우 함수).
+-- 평균은 사람이 확인한 요금(VERIFIED)만으로 계산해, 예시 값이 비교 기준을 흐리지 않게 한다.
 CREATE VIEW v_cafe_price_vs_region AS
 SELECT
   c.cafe_id,
   c.name                                   AS cafe_name,
   r.sido,
   r.sigungu,
-  p.room_type,
+  st.code                                  AS seat_type,
   p.price                                  AS hourly_price,
-  ROUND(AVG(p.price) OVER (PARTITION BY r.region_id, p.room_type), 0) AS region_avg_price,
-  p.price - ROUND(AVG(p.price) OVER (PARTITION BY r.region_id, p.room_type), 0) AS diff_from_avg,
-  COUNT(*) OVER (PARTITION BY r.region_id, p.room_type)               AS cafe_count_in_region
+  ROUND(AVG(p.price) OVER (PARTITION BY r.region_id, p.seat_type_id), 0) AS region_avg_price,
+  p.price - ROUND(AVG(p.price) OVER (PARTITION BY r.region_id, p.seat_type_id), 0) AS diff_from_avg,
+  COUNT(*) OVER (PARTITION BY r.region_id, p.seat_type_id)               AS cafe_count_in_region
 FROM price_plan p
-JOIN cafe   c ON c.cafe_id   = p.cafe_id
-JOIN region r ON r.region_id = c.region_id
-WHERE p.plan_type = 'HOURLY';
+JOIN cafe      c  ON c.cafe_id       = p.cafe_id
+JOIN region    r  ON r.region_id     = c.region_id
+JOIN seat_type st ON st.seat_type_id = p.seat_type_id
+WHERE p.plan_type = 'HOURLY' AND p.price_source = 'VERIFIED';

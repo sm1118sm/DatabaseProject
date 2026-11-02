@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server/index.js",
     "db:init": "node scripts/init-db.js",
-    "collect": "node scripts/collect-kakao.js"
+    "collect": "node scripts/collect-kakao.js",
+    "db:import": "node scripts/import-cafes.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
