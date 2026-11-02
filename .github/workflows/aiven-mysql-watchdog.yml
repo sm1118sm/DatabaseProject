@@ -3,7 +3,8 @@ name: Aiven MySQL watchdog
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
+    # Keep five-minute intervals, away from the busiest round-minute slots.
+    - cron: "2-59/5 * * * *"
       timezone: "Asia/Seoul"
 
 permissions:
