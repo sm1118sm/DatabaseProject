@@ -74,7 +74,7 @@ Vercel 프로젝트 Settings → Environment Variables (Production, Preview 모�
 ## 자동 복구 동작과 검증
 
 - 참고: https://github.com/sm1118sm/ai-commerce-platform/blob/main/.github/workflows/aiven-mysql-watchdog.yml
-- 참고 저장소의 Aiven 작업과 동일하게 5분마다 실행하고, 한 실행에서 30초 간격으로 10번 상태를 확인한다.
+- 참고 저장소처럼 5분 간격의 예약 실행을 요청하며, 한 실행에서 30초 간격으로 10번 상태를 확인한다. 실제 시작 시각은 GitHub의 실행 대기 상태에 따라 달라진다.
 - POWEROFF이면 전원을 켜고 RUNNING이 될 때까지 기다린다. 작업 제한 시간은 참고 코드와 같은 15분이다.
 - 서비스 상태를 확인하는 작업이며, 카페 데이터를 재수집하거나 기존 DB를 초기화하지 않는다.
 - GitHub 예약 실행은 기본 브랜치에서 작동하며, 실행이 지연될 수 있어 정확한 5분 간격이나 무중단을 보장하지 않는다.

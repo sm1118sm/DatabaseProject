@@ -5,6 +5,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const pool = require('./db');
 const retryTransaction = require('./retry-transaction');
+const listAvailability = require('./list-availability');
 
 const app = express();
 app.use(express.json({ limit: '200kb' }));
@@ -510,6 +511,16 @@ const intervalOf = (q) => {
   const s = num(q.start, 0, 23), e = num(q.end, 1, 24);
   return s != null && e != null && e > s ? [addHours(d0, s), addHours(d0, e)] : null;
 };
+app.get('/api/cafes/availability', wrap(async (req, res) => {
+  const iv = intervalOf(req.query);
+  const raw = typeof req.query.placeIds === 'string' ? req.query.placeIds.split(',') : [];
+  if (!iv || !SEAT_TYPES.includes(req.query.type) || !raw.length || raw.length > 40 || raw.some((id) => !/^(?:\d+|sample-\d+)$/.test(id))) {
+    return res.status(400).json({ error: '조회 조건이 올바르지 않습니다.' });
+  }
+  res.set('Cache-Control', 'no-store');
+  res.json(await listAvailability(pool, [...new Set(raw)], req.query.type, sqlTime(iv[0]), sqlTime(iv[1])));
+}));
+
 app.get('/api/cafes/by-place/:placeId/taken', wrap(async (req, res) => {
   const iv = intervalOf(req.query);
   if (!iv || !SEAT_TYPES.includes(req.query.type)) return res.status(400).json({ error: '조회 조건이 올바르지 않습니다.' });
