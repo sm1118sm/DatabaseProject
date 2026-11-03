@@ -1,0 +1,28 @@
+name: Free DB recovery window
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  enable-cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Open the official 15-minute disk-cleanup write window
+        env:
+          AIVEN_TOKEN: ${{ secrets.AIVEN_TOKEN }}
+          AIVEN_PROJECT: ${{ vars.AIVEN_PROJECT }}
+          AIVEN_SERVICE: ${{ vars.AIVEN_SERVICE }}
+        shell: python
+        run: |
+          import json, os, urllib.request, urllib.parse
+          project = urllib.parse.quote(os.environ['AIVEN_PROJECT'], safe='')
+          service = urllib.parse.quote(os.environ['AIVEN_SERVICE'], safe='')
+          url = f'https://api.aiven.io/v1/project/{project}/service/{service}/enable-writes'
+          request = urllib.request.Request(url, data=b'{}', method='POST', headers={
+              'Authorization': 'aivenv1 ' + os.environ['AIVEN_TOKEN'],
+              'Content-Type': 'application/json'})
+          with urllib.request.urlopen(request, timeout=30) as response:
+              result = json.load(response)
+          print(result.get('message', 'Cleanup window opened'))
+          print('Until:', result.get('until', 'see service status'))

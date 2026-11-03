@@ -5,6 +5,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const pool = require('./db');
 const retryTransaction = require('./retry-transaction');
+const hasReservationOverlap = require('./reservation-overlap');
 const listAvailability = require('./list-availability');
 
 const app = express();
@@ -528,10 +529,11 @@ app.get('/api/cafes/by-place/:placeId/taken', wrap(async (req, res) => {
   if (!cafe) return res.json({ cafeId: null, taken: [] }); // 아직 예약이 없는 카페
   const skip = Number(req.query.skip) || 0;
   const [rows] = await pool.query(
-    `SELECT DISTINCT s.label FROM reservation_slot rs
-     JOIN seat s ON s.seat_id = rs.seat_id JOIN seat_type st ON st.seat_type_id = s.seat_type_id
-     WHERE s.cafe_id = ? AND st.code = ? AND rs.slot_start >= ? AND rs.slot_start < ? AND rs.reservation_id <> ?`,
-    [cafe.cafe_id, req.query.type, sqlTime(iv[0]), sqlTime(iv[1]), skip]);
+    `SELECT DISTINCT s.label FROM reservation r
+     JOIN seat s ON s.seat_id = r.seat_id JOIN seat_type st ON st.seat_type_id = s.seat_type_id
+     WHERE s.cafe_id = ? AND st.code = ? AND r.status = 'CONFIRMED'
+       AND r.start_at < ? AND r.end_at > ? AND r.reservation_id <> ?`,
+    [cafe.cafe_id, req.query.type, sqlTime(iv[1]), sqlTime(iv[0]), skip]);
   res.json({ cafeId: cafe.cafe_id, taken: rows.map((r) => r.label) });
 }));
 
@@ -539,10 +541,12 @@ const availability = wrap(async (req, res) => {
   const date = String(req.query.date || '');
   if (!isDate(date)) return res.status(400).json({ error: 'date=YYYY-MM-DD 형식이 필요합니다.' });
   const [rows] = await pool.query(
-    `SELECT HOUR(slot_start) AS hour FROM reservation_slot
-     WHERE seat_id = ? AND slot_start >= ? AND slot_start < DATE_ADD(?, INTERVAL 1 DAY)`,
-    [Number(req.params.id), date, date]);
-  res.json({ date, reservedHours: rows.map((r) => r.hour) });
+    `SELECT start_at, end_at FROM reservation WHERE seat_id = ? AND status = 'CONFIRMED'
+     AND start_at < DATE_ADD(?, INTERVAL 1 DAY) AND end_at > ?`, [Number(req.params.id), date, date]);
+  const base = new Date(`${date}T00:00:00`);
+  const reservedHours = Array.from({ length: 24 }, (_, h) => h).filter((h) =>
+    rows.some((r) => r.start_at < sqlTime(addHours(base, h + 1)) && r.end_at > sqlTime(addHours(base, h))));
+  res.json({ date, reservedHours });
 });
 app.get('/api/seats/:id/availability', availability);
 app.get('/api/rooms/:id/availability', availability); // 옛 주소 호환
@@ -618,6 +622,9 @@ app.post('/api/reservations', auth, requireVerified, bookingWrap(async (req, res
       if (!m || m.point_balance < total) { await conn.rollback(); return res.status(400).json({ error: '포인트가 부족합니다.' }); }
     }
 
+    if (await hasReservationOverlap(conn, seat.seat_id, sqlTime(span.start), sqlTime(span.end))) {
+      await conn.rollback(); return res.status(409).json({ error: '이미 예약된 시간입니다. 다른 시간을 선택해주세요.' });
+    }
     const [ins] = await conn.query(
       `INSERT INTO reservation (member_id, seat_id, start_at, end_at, status, total_price) VALUES (?, ?, ?, ?, 'CONFIRMED', ?)`,
       [req.member.memberId, seat.seat_id, sqlTime(span.start), sqlTime(span.end), total]);
@@ -720,8 +727,11 @@ app.put('/api/reservations/:id(\\d+)', auth, bookingWrap(async (req, res) => {
       const [[m]] = await conn.query('SELECT point_balance FROM member WHERE member_id = ? FOR UPDATE', [req.member.memberId]);
       if (m.point_balance < diff) { await conn.rollback(); return res.status(400).json({ error: '차액을 낼 포인트가 부족합니다.' }); }
     }
+    if (await hasReservationOverlap(conn, rs.seat_id, sqlTime(span.start), sqlTime(span.end), id)) {
+      await conn.rollback(); return res.status(409).json({ error: '이미 예약된 시간입니다. 다른 시간을 선택해주세요.' });
+    }
     await conn.query('DELETE FROM reservation_slot WHERE reservation_id = ?', [id]);
-    await conn.query('INSERT INTO reservation_slot (seat_id, slot_start, reservation_id) VALUES ?', [slotRowsOf(rs.seat_id, span, id)]); // 겹치면 기본키가 막는다
+    await conn.query('INSERT INTO reservation_slot (seat_id, slot_start, reservation_id) VALUES ?', [slotRowsOf(rs.seat_id, span, id)]); // 실제 예약의 시간별 고유키도 유지한다
     await conn.query('UPDATE reservation SET start_at = ?, end_at = ?, total_price = ? WHERE reservation_id = ?', [sqlTime(span.start), sqlTime(span.end), total, id]);
     await conn.query('UPDATE payment SET amount = ? WHERE reservation_id = ?', [total, id]);
     if (pay.method === 'POINT' && diff !== 0) {
