@@ -15,14 +15,23 @@ jobs:
           AIVEN_SERVICE: ${{ vars.AIVEN_SERVICE }}
         shell: python
         run: |
-          import json, os, urllib.request, urllib.parse
+          import json, os, urllib.request, urllib.parse, urllib.error
           project = urllib.parse.quote(os.environ['AIVEN_PROJECT'], safe='')
           service = urllib.parse.quote(os.environ['AIVEN_SERVICE'], safe='')
           url = f'https://api.aiven.io/v1/project/{project}/service/{service}/enable-writes'
           request = urllib.request.Request(url, data=b'{}', method='POST', headers={
               'Authorization': 'aivenv1 ' + os.environ['AIVEN_TOKEN'],
               'Content-Type': 'application/json'})
-          with urllib.request.urlopen(request, timeout=30) as response:
-              result = json.load(response)
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  result = json.load(response)
+          except urllib.error.HTTPError as error:
+              text = error.read().decode('utf-8', errors='replace')
+              text = text.replace(os.environ['AIVEN_TOKEN'], '[redacted]')
+              try:
+                  detail = json.loads(text).get('message', 'No message')
+              except ValueError:
+                  detail = 'Non-JSON response'
+              raise SystemExit(f'Aiven cleanup API rejected the request: HTTP {error.code}: {detail}')
           print(result.get('message', 'Cleanup window opened'))
           print('Until:', result.get('until', 'see service status'))
