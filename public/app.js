@@ -336,10 +336,10 @@
     ['프린터', 'printer', 'fac', 'p'], ['역세권', 'train', 'near', 'nearStation'], ['대학가', 'school', 'near', 'nearUniv'], ['사물함', 'locker', 'fac', 'l'],
   ];
   const catOn = (kind, val) => (kind === 'fac' ? S.q.fac.includes(val) : kind === 'seat' ? S.q.seat === val : S.q[val]);
-  // 보고 있는 지역(또는 내 위치 모드)에 카카오에서 가져온 실제 카페가 있으면, 카카오가 시설 정보를 주지 않아 시설 필터를 쓸 수 없다
+  // 실제 장소 정보와 가상 시연 카페를 구분한다.
   const realMode = () => D.cafes.some((c) => c.real && (S.q.geo || (c.sido === S.q.sido && c.sigungu === S.q.sigungu)));
-  const FAC_OFF = 'disabled title="카카오맵 데이터에는 시설 정보가 없어요"';
-  const catsHtml = () => CATS.map(([t, ic, kind, val]) => `<button class="cat" data-act="cat" data-kind="${kind}" data-v="${val}" aria-pressed="${!!catOn(kind, val)}" ${kind === 'fac' && realMode() ? FAC_OFF : ''}><span class="ci">${ico(ic, 18)}</span>${t}</button>`).join('');
+  const matchesFacilities = (c, selected) => selected.every((f) => (c.fac || []).includes(f));
+  const catsHtml = () => CATS.map(([t, ic, kind, val]) => `<button class="cat" data-act="cat" data-kind="${kind}" data-v="${val}" aria-pressed="${!!catOn(kind, val)}"><span class="ci">${ico(ic, 18)}</span>${t}</button>`).join('');
   const refreshCats = () => { const e = $('#cats'); if (e) e.innerHTML = catsHtml(); };
 
   function timeOptions(sel, from, to) {
@@ -392,8 +392,8 @@
             <div class="stepper"><button data-act="people" data-v="-1" aria-label="인원 줄이기">−</button><span>${q.people}명</span><button data-act="people" data-v="1" aria-label="인원 늘리기">+</button></div>
             ${q.people > 1 ? '<p class="note">2인 이상은 스터디룸만 예약할 수 있어요.</p>' : ''}</div></div>
           <div class="field" style="margin-bottom:0"><span class="lbl">시설 옵션</span><div class="chips">
-            ${facShown.map(([k, t]) => `<button class="chip" data-act="fac" data-v="${k}" aria-pressed="${q.fac.includes(k)}" ${realMode() ? FAC_OFF : ''}>${ico(FACICO[k], 15)}${t}</button>`).join('')}${facHidden > 0 ? `<button class="chip more" data-act="facmore">+ 더보기 ${facHidden}</button>` : S.facMore ? '<button class="chip more" data-act="facmore">접기</button>' : ''}</div>
-            ${realMode() ? '<p class="note" style="margin-top:8px">카카오맵 데이터에는 시설·좌석 유형·운영 시간 정보가 없어서, 이 항목들은 목록을 걸러내지 못해요. 요금 표시만 바뀌어요.</p>' : ''}</div>
+            ${facShown.map(([k, t]) => `<button class="chip" data-act="fac" data-v="${k}" aria-pressed="${q.fac.includes(k)}">${ico(FACICO[k], 15)}${t}</button>`).join('')}${facHidden > 0 ? `<button class="chip more" data-act="facmore">+ 더보기 ${facHidden}</button>` : S.facMore ? '<button class="chip more" data-act="facmore">접기</button>' : ''}</div>
+            ${realMode() ? '<p class="note" style="margin-top:8px">시설 조건을 선택하면 해당 시설이 확인된 카페만 표시해요. 카카오 장소 검색에는 시설·운영 시간 정보가 없어, 미확인 카페는 결과에서 제외돼요.</p>' : ''}</div>
         </div>
         <div class="pgroup">
           <h3>거리·주변</h3>
@@ -465,7 +465,7 @@
       const d = dist(org, [c.lat, c.lng]);
       // 반경은 '내 주변' 모드에서는 내 위치에서, 지역을 직접 고른 모드에서는 그 지역의 중심에서 잰다
       if (q.radius && !ignoreRadius && (q.geo ? d : dist(regionOf().center, [c.lat, c.lng])) > q.radius) continue;
-      if (!c.real && q.fac.some((f) => !c.fac.includes(f))) continue; // 실제 카페는 시설 정보가 없어 시설로 거르지 않는다
+      if (!matchesFacilities(c, q.fac)) continue; // 미확인 시설을 보유한 것으로 간주하지 않는다
       if (q.nearStation && !c.station) continue;
       if (q.nearUniv && !c.univ) continue;
       if (!isOpen(c, v)) continue;
@@ -538,7 +538,7 @@
     const loading = !!S.regionLoading, noKakao = !S.kakao && !D.cafes.some((c) => c.sido === q.sido && c.sigungu === q.sigungu);
     const empty = loading ? `<li class="empty"><h3>카카오맵에서 ${esc(q.sigungu)} 스터디카페를 불러오는 중이에요</h3><p class="muted">처음 보는 지역은 몇 초 걸려요. 한 번 불러온 지역은 다음부터 바로 보여요.</p></li>`
       : noKakao ? `<li class="empty"><h3>이 지역은 카카오맵 연결이 필요해요</h3><p class="muted">지도를 불러오지 못해 실제 카페 정보를 가져올 수 없어요. 잠시 뒤 다시 시도해 주세요.</p></li>`
-      : `<li class="empty"><h3>조건에 맞는 스터디카페가 없어요</h3><p class="muted">${q.geo ? '내 주변에 카페가 없을 수 있어요. 지역을 직접 선택해 보세요.' : S.regionError === `${q.sido}|${q.sigungu}` ? '카카오맵에서 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.' : '이 지역에는 카카오맵에 등록된 스터디카페가 없거나, 조건에 맞는 곳이 없어요.'}</p><button class="btn primary" data-act="reset">조건 초기화</button></li>`;
+      : `<li class="empty"><h3>${q.fac.length ? '선택한 시설이 확인된 카페가 없어요' : '조건에 맞는 스터디카페가 없어요'}</h3><p class="muted">${q.fac.length ? '시설 정보 미확인은 시설이 없다는 뜻이 아니에요. 시설 조건을 해제하면 다른 카페도 볼 수 있어요.' : q.geo ? '내 주변에 카페가 없을 수 있어요. 지역을 직접 선택해 보세요.' : S.regionError === `${q.sido}|${q.sigungu}` ? '카카오맵에서 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.' : '이 지역에는 카카오맵에 등록된 스터디카페가 없거나, 조건에 맞는 곳이 없어요.'}</p><button class="btn primary" data-act="${q.fac.length ? 'clearFac' : 'reset'}">${q.fac.length ? '시설 조건 해제' : '조건 초기화'}</button></li>`;
     const hlIdx = list.findIndex((it) => it.c.id === S.hl);
     if (hlIdx >= S.limit) S.limit = hlIdx + 1; // 지도에서 고른 카페가 목록에 보이도록 목록을 그 위치까지 펼친다
     const shown = list.slice(0, S.limit);
@@ -550,7 +550,8 @@
     const asof = t0 && realMode() ? `카카오맵 ${ago(t0)} 기준` : '';
     const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.quick.map(([sd, sg]) => `<button class="chip" data-act="region" data-s="${esc(sd)}" data-g="${esc(sg)}" aria-pressed="${!q.geo && q.sido === sd && q.sigungu === sg}">${esc(sg)}</button>`).join('')}</div>`;
     const nearNotice = nearestOnly && list.length ? `<div class="note" style="margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span>내 위치 반경 ${q.radius || 5}km 안에는 카페가 없어요. 반경 밖의 카페 ${list.length}곳을 가까운 순으로 모두 보여드려요. (가장 가까운 곳: ${km(list[0].d)})</span><button class="btn sm" data-act="geo">내 위치 해제</button></div>` : ``;
-    box.innerHTML = `${locNote}${realNote}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
+    const facNote = q.fac.length ? `<p class="note" role="status">시설 조건: ${q.fac.map((f) => esc(FAC[f] || f)).join(' · ')} — 선택한 시설이 확인된 카페만 표시해요. 미확인 카페는 제외돼요.</p>` : '';
+    box.innerHTML = `${locNote}${realNote}${facNote}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
       <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}${asof ? ` · ${asof}` : ''}</small></div>
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
           <button class="tab map-toggle" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} ${q.view === 'map' ? '목록만 보기' : '지도로 보기'}</button></div></div>
@@ -1296,8 +1297,8 @@
   // 이벤트
   // =====================================================================================
   const resetSearch = () => { const keep = S.q.view; S.q = freshQuery(); S.q.view = keep; };
-  const afterQuery = () => { if (realMode()) S.q.fac = []; S.limit = PAGE; refreshPanel(); refreshCats(); renderResults(); };
-  const onRealLoaded = () => { if (realMode()) S.q.fac = []; refreshPanel(); refreshCats(); refreshMaps(); };
+  const afterQuery = () => { S.limit = PAGE; refreshPanel(); refreshCats(); renderResults(); };
+  const onRealLoaded = () => { refreshPanel(); refreshCats(); refreshMaps(); };
   const ACT = {
     home: (t, e) => { e.preventDefault(); location.hash = 'home'; if (!$('#panel')) return; window.scrollTo(0, 0); },
     goto: (t) => { const h = t.dataset.hash; if (location.hash === '#' + h) route(); else location.hash = h; },
@@ -1332,6 +1333,7 @@
     seat: (t) => { S.q.seat = t.dataset.v; if (S.q.seat !== 'ROOM' && S.q.people > 1) S.q.people = 1; if (S.q.seat === 'ROOM' && S.q.people < 2) S.q.people = 1; afterQuery(); },
     people: (t) => { S.q.people = clamp(S.q.people + Number(t.dataset.v), 1, 8); if (S.q.people > 1) S.q.seat = 'ROOM'; afterQuery(); },
     fac: (t) => { const f = t.dataset.v, i = S.q.fac.indexOf(f); if (i < 0) S.q.fac.push(f); else S.q.fac.splice(i, 1); afterQuery(); },
+    clearFac: () => { S.q.fac = []; afterQuery(); },
     // ② 지역
     near: (t) => { S.q[t.dataset.k] = !S.q[t.dataset.k]; afterQuery(); },
     // '내 주변' 모드를 켜고 끈다. 끄면 고른 지역만 보여주되, 거리는 계속 현재 위치에서 잰다.
