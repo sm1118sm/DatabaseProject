@@ -186,7 +186,7 @@
   const diffBadge = (diff, avg, small) => {
     const cls = diff === 0 ? 'even' : diff < 0 ? 'low' : 'high';
     const pct = avg ? Math.round((Math.abs(diff) / avg) * 100) : 0;
-    const lead = small ? '' : '평균보다 '; // 표 안에서는 짧게 (아래 안내 문구가 기준을 설명한다)
+    const lead = small ? '' : '<span class="dlead">평균보다 </span>'; // 표 안에서는 짧게, 아주 좁은 폰에서는 숨긴다 (아래 안내 문구가 기준을 설명한다)
     const t = diff === 0 ? '평균 수준' : diff < 0 ? `▼ ${lead}${won(-diff)} 저렴${pct ? ` (${pct}%)` : ''}` : `▲ ${lead}${won(diff)} 비쌈${pct ? ` (${pct}%)` : ''}`;
     return `<span class="dbadge ${cls}${small ? ' sm' : ''}">${t}</span>`;
   };
