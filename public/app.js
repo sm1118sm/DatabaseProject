@@ -422,6 +422,7 @@
   const COND_KEY = 'studymoa:cond';
   const condReady = () => { try { return sessionStorage.getItem(COND_KEY) === '1'; } catch { return !!S.condReady; } };
   const setCond = () => { S.condReady = true; try { sessionStorage.setItem(COND_KEY, '1'); } catch { /* 저장소 사용 불가 */ } updateGate(); };
+  const APPLIED = "고른 조건이 적용됐어요. 확인한 뒤 '이 조건으로 비교하기'를 눌러 주세요.";
   const NEED_COND = "검색 조건을 먼저 정하고 '이 조건으로 비교하기'를 눌러 주세요.";
   function updateGate() {
     const on = condReady();
@@ -512,7 +513,6 @@
       ['chart', '비교·추천', '지역 평균 요금과 비교해 저렴한 곳부터 보여 드려요.', 'compare', 'f3'],
       ['list', '고객 예약', '남은 좌석을 번호까지 골라 예약하고 변경·취소도 해요.', 'reservations', 'f4'],
     ];
-    const steps = [['조건 고르기', '언제 어떤 자리를 쓸지 정해요'], ['지역 정하기', '동네나 내 위치를 골라요'], ['비교하기', '평균 대비 요금을 확인해요'], ['예약하기', '좌석 번호를 골라 결제해요']];
     const regionOpts = D.regions.map((r) => `<option value="${esc(r.sido)}|${esc(r.sigungu)}"${S.q.sido === r.sido && S.q.sigungu === r.sigungu ? ' selected' : ''}>${esc(r.sido === r.sigungu ? r.sido : `${r.sido} ${r.sigungu}`)}</option>`).join('');
     const reviewBlock = recentReviews(), realCount = D.cafes.filter((c) => c.real).length;
     view.innerHTML = `
@@ -521,11 +521,10 @@
       <div class="hm-bg" aria-hidden="true"></div>
       <div class="wrap hm-hero-in">
         <div class="hm-copy">
-          <span class="hm-badge">${ico('check', 14)}지역 평균 요금과 한눈에 비교</span>
+          <span class="hm-badge">${ico('pin', 14)}전국 시·군·구 스터디카페</span>
           <h1>우리 동네 스터디카페,<br><em>평균보다 얼마나 저렴할까?</em></h1>
           <p>요금과 남은 좌석을 비교하고, 마음에 드는 자리를 번호까지 골라 바로 예약하세요.</p>
           <div class="hm-cta"><button class="btn primary lg hm-big" data-act="goto" data-hash="options">지금 시작하기</button><button class="btn lg hm-big hm-ghost" data-act="goto" data-hash="guide">이용 방법 보기</button></div>
-          <div class="hm-stats"><div><b>전국</b>시·군·구 단위 비교</div><div><b>7종</b>시설 조건 필터</div><div><b>실시간</b>좌석 현황 확인</div></div>
         </div>
         <div aria-hidden="true">
           <div class="hm-bento">
@@ -553,11 +552,6 @@
     <section class="section hm-sec rv"><div class="wrap">
       <div class="hm-head"><span class="pg-kicker">한 곳에서</span><h2>스터디카페 찾기부터<br>예약까지</h2><p>필요한 기능을 단계별 화면으로 나눠 두었어요.</p></div>
       <div class="hm-feat">${feat.map(([ic, t, d, h, c]) => `<button class="hm-fcard ${c}" data-act="goto" data-hash="${h}"><span class="hm-fi ${c}">${ico(ic, 24)}</span><span class="hm-go" aria-hidden="true">→</span><h3>${t}</h3><p>${d}</p></button>`).join('')}</div>
-    </div></section>
-
-    <section class="section hm-sec rv"><div class="wrap">
-      <div class="hm-head"><span class="pg-kicker">이용 방법</span><h2>네 단계면 끝나요</h2></div>
-      <ol class="hm-steps">${steps.map(([t, d], i) => `<li><span class="hm-sn">${String(i + 1).padStart(2, '0')}</span><b>${t}</b><small>${d}</small></li>`).join('')}</ol>
     </div></section>
 
     <section class="section rv"><div class="wrap"><div class="hm-band">
@@ -985,12 +979,18 @@
       resolve(false);
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }));
   }
+  // 홈의 빠른 검색 칸을 지금 검색 조건에 맞춘다 (위치가 홈이 그려진 뒤에 도착해도 반영되도록)
+  function syncHomeSearch() {
+    const r = $('#hsRegion'); if (r) r.value = `${S.q.sido}|${S.q.sigungu}`;
+    const d = $('#hsDate'); if (d) d.value = S.q.date;
+    const s = $('#hsStart'); if (s) s.value = String(S.q.start);
+  }
   // 현재 위치를 받아 지역 선택(시/도·구/군)과 결과를 그 위치로 바꾼다. 성공하면 true.
   function applyLocation(announce) {
     if (S.locating) return Promise.resolve(false);
     return locate().then((ok) => {
       if (!ok) { renderResults(); return false; }
-      refreshPanel(); refreshCats();
+      syncHomeSearch(); refreshPanel(); refreshCats();
       const pr = ensureRegion(regionOf()); renderResults(); pr.finally(() => onRealLoaded()); // 지금 있는 시·군·구의 카페 전체를 불러온다
       if (announce) toast(`현재 위치를 반영했어요: ${S.q.sido} ${S.q.sigungu}`);
       return true;
@@ -1459,7 +1459,7 @@
       if (q.end <= q.start) q.end = Math.min(q.start + 3, 24);
       S.limit = PAGE; rememberRegion();
       ensureRegion(regionOf()).finally(() => onRealLoaded());
-      ACT.runCompare();
+      toast(APPLIED); location.hash = 'search'; // 바로 비교하지 않고 검색 조건에서 확인하게 한다
     },
     runCompare: () => { setCond(); if (location.hash === '#compare') route(); else location.hash = 'compare'; }, // '이 조건으로 비교하기'
     // 옛 메뉴 이름(sec-*)도 새 화면 주소로 연결한다
@@ -1467,7 +1467,7 @@
     homeCat: (t) => { // 홈의 인기 카테고리: 조건을 켜고 비교 화면으로 간다
       const { kind, v } = t.dataset;
       if (kind === 'fac') { if (!S.q.fac.includes(v)) S.q.fac.push(v); } else if (kind === 'seat') { S.q.seat = v; S.q.people = 1; } else S.q[v] = true;
-      S.limit = PAGE; ACT.runCompare();
+      S.limit = PAGE; toast(APPLIED); location.hash = 'search'; // 바로 비교하지 않고 검색 조건에서 확인하게 한다
     },
     soon: () => toast('준비 중인 페이지예요.'),
     closeModal,
