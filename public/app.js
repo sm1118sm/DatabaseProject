@@ -457,7 +457,8 @@
   const condReady = () => { try { return sessionStorage.getItem(COND_KEY) === '1'; } catch { return !!S.condReady; } };
   const setCond = () => { S.condReady = true; try { sessionStorage.setItem(COND_KEY, '1'); } catch { /* 저장소 사용 불가 */ } updateGate(); };
   const APPLIED = "고른 조건이 적용됐어요. 확인한 뒤 '이 조건으로 비교하기'를 눌러 주세요.";
-  const NEED_COND = "검색 조건을 먼저 정하고 '이 조건으로 비교하기'를 눌러 주세요.";
+  const NEED_COND = '검색 조건에서 지역을 먼저 골라 주세요. 지역을 고르면 비교·추천이 열려요.';
+  const clearCond = () => { S.condReady = false; try { sessionStorage.removeItem(COND_KEY); } catch { /* 저장소 사용 불가 */ } updateGate(); };
   function updateGate() {
     const on = condReady();
     document.querySelectorAll('.mainnav [data-hash="compare"]').forEach((b) => {
@@ -483,7 +484,7 @@
     const rows = [['지역', where], ['이용 형태', v.mode === 'HOURLY' ? '시간제' : '기간제'], ['일시', when], ['좌석', seat], ['시설', q.fac.length ? q.fac.map((k) => FAC[k]).join('·') : '선택 안 함'], ['거리', q.radius ? `반경 ${q.radius}km` : '제한 없음'], ['정렬', { price: '최저가순', distance: '거리순', rating: '평점순', diff: '평균 대비 저렴순' }[q.sort] || '최저가순']];
     return `<h3>선택한 조건</h3><dl>${rows.map(([k, t]) => `<div><dt>${k}</dt><dd>${esc(t)}</dd></div>`).join('')}</dl>
       <button class="btn primary lg block" data-act="runCompare">이 조건으로 비교하기 →</button>
-      ${condReady() ? '' : '<p class="note gatenote">이 버튼을 누르면 비교·추천 메뉴가 열려요.</p>'}
+      ${condReady() ? '' : '<p class="note gatenote">지역을 고르면 비교·추천 메뉴가 열려요.</p>'}
       <button class="btn block" data-act="reset" style="margin-top:8px">조건 초기화</button>`;
   }
   function panelHtml() {
@@ -1514,7 +1515,7 @@
     },
     homeSearch: () => { // 홈의 빠른 검색: 고른 지역·날짜·시간으로 바로 비교 화면
       const [sido, sigungu] = ($('#hsRegion').value || '').split('|'), q = S.q;
-      if (sido && sigungu) { q.sido = sido; q.sigungu = sigungu; q.geo = null; }
+      if (sido && sigungu) { q.sido = sido; q.sigungu = sigungu; q.geo = null; setCond(); }
       q.date = $('#hsDate').value || todayStr();
       q.start = Number($('#hsStart').value);
       if (q.end <= q.start) q.end = Math.min(q.start + 3, 24);
@@ -1568,7 +1569,7 @@
     // '내 주변' 모드를 켜고 끈다. 끄면 고른 지역만 보여주되, 거리는 계속 현재 위치에서 잰다.
     geo: () => {
       if (S.q.geo) { S.q.geo = null; afterQuery(); return; }
-      const on = () => { S.q.geo = S.me; if (!S.q.radius) S.q.radius = 5; afterQuery(); ensureNear(S.me, S.q.radius).finally(() => onRealLoaded()); };
+      const on = () => { S.q.geo = S.me; if (!S.q.radius) S.q.radius = 5; setCond(); afterQuery(); ensureNear(S.me, S.q.radius).finally(() => onRealLoaded()); };
       if (S.me) { on(); return; }
       toast('위치를 확인하는 중이에요…');
       applyLocation().then((ok) => { if (ok) on(); });
@@ -1581,7 +1582,7 @@
       afterQuery();
     },
     search: () => ACT.runCompare(),
-    reset: () => { resetSearch(); document.querySelectorAll('.cat').forEach((b) => b.setAttribute('aria-pressed', 'false')); afterQuery(); },
+    reset: () => { resetSearch(); clearCond(); document.querySelectorAll('.cat').forEach((b) => b.setAttribute('aria-pressed', 'false')); afterQuery(); },
     // ③ 비교·추천
     region: (t) => {
       S.q.sido = t.dataset.s; S.q.sigungu = t.dataset.g; S.q.geo = null; rememberRegion(); afterQuery();
@@ -1695,8 +1696,8 @@
     if (t.dataset.q) { // 검색 패널 입력
       const k = t.dataset.q, q = S.q;
       if (k === 'date') q.date = t.value || todayStr();
-      else if (k === 'sido') { q.sido = t.value; q.sigungu = D.regions.find((r) => r.sido === t.value).sigungu; q.geo = null; }
-      else if (k === 'sigungu') { q.sigungu = t.value; q.geo = null; }
+      else if (k === 'sido') { q.sido = t.value; q.sigungu = D.regions.find((r) => r.sido === t.value).sigungu; q.geo = null; setCond(); }
+      else if (k === 'sigungu') { q.sigungu = t.value; q.geo = null; setCond(); }
       else if (k === 'radius') q.radius = Number(t.value);
       else if (k === 'start') { q.start = Number(t.value); if (q.end <= q.start) q.end = q.start + 1; }
       else if (k === 'end') q.end = Number(t.value);
