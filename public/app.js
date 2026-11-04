@@ -644,18 +644,20 @@
   }
 
   // ---- 검색 결과 ---------------------------------------------------------------------
-  const NEAR_DEFAULT_KM = 5, NEAR_WIDEN_KM = [10, 20, 30, 50]; // 내 주변 기본 반경, 비었을 때 넓혀 보는 단계
+  const NEAR_DEFAULT_KM = 5; // 내 주변에서 카페를 불러올 때 기준으로 삼는 거리
   function results(ignoreRadius = false) {
     const q = S.q, v = qView(), org = origin();
     const list = [];
+    const nearKeys = q.geo && !q.radius ? new Set(nearRegions(q.geo, NEAR_DEFAULT_KM).map(regKey)) : null;
     for (const c of D.cafes) {
       const p = price(c, v.type, v.mode, v.plan);
       if (p == null) continue;
       if (!q.geo && (c.sido !== q.sido || c.sigungu !== q.sigungu)) continue;
       const d = dist(org, [c.lat, c.lng]);
-      // 반경은 '내 주변' 모드에서는 내 위치에서, 지역을 직접 고른 모드에서는 그 지역의 중심에서 잰다
-      const rad = q.geo ? (q.radius || NEAR_DEFAULT_KM) : q.radius; // 내 주변은 반경 제한을 풀 수 없다
-      if (rad && !ignoreRadius && (q.geo ? d : dist(regionOf().center, [c.lat, c.lng])) > rad) continue;
+      // 반경은 카드에 표시되는 거리(내 위치, 위치를 모르면 고른 지역의 중심)와 같은 기준으로 잰다
+      if (q.radius && !ignoreRadius && d > q.radius) continue;
+      // 내 주변 + 반경 제한 없음: 예전에 불러온 먼 지역의 카페가 섞이지 않게 내 위치와 가까운 지역의 카페만 쓴다
+      if (q.geo && !q.radius && !ignoreRadius && !nearKeys.has(regKey(c))) continue;
       if (!matchesFacilities(c, q.fac)) continue; // 미확인 시설을 보유한 것으로 간주하지 않는다
       if (q.nearStation && !c.station) continue;
       if (q.nearUniv && !c.univ) continue;
@@ -675,7 +677,7 @@
     const mean = (mode, plan) => { const a = pool.map((c) => price(c, v.type, mode, plan)).filter((x) => x != null); return a.length ? Math.round(a.reduce((s, x) => s + x, 0) / a.length) : null; };
     const items = [['시간제', mean('HOURLY')]];
     if (v.type !== 'ROOM') Object.entries(PLAN).forEach(([k, t]) => items.push([t, mean('PERIOD', k)]));
-    const title = q.geo ? `내 주변 ${q.radius || 5}km 이내` : q.sigungu;
+    const title = q.geo ? (q.radius ? `내 주변 ${q.radius}km 이내` : '내 주변') : q.sigungu;
     return `<p class="avgline">${esc(title)} ${SEAT[v.type]} 평균 · ${items.filter(([, x]) => x != null).map(([t, x]) => `${t} <b>${won(x)}</b>`).join(' · ')}</p>`;
   }
 
@@ -722,20 +724,16 @@
     if (!box) return;
     let list = results();
     const v = qView(), q = S.q;
-    // 내 위치 모드에서 반경 안에 카페가 없으면 가장 가까운 카페를 대신 보여준다
-    const nearestOnly = q.geo && !list.length;
-    let widened = 0;
-    if (nearestOnly) { // 반경 안이 비면 반경을 조금씩 넓혀서(최대 50km) 가까운 카페만 보여준다. 예전에 불러온 먼 지역의 카페는 섞지 않는다.
-      const all = results(true).sort((a, b) => a.d - b.d);
-      for (const r of NEAR_WIDEN_KM) { const within = all.filter((x) => x.d <= r); if (within.length) { list = within; widened = r; break; } }
-    }
+    // 반경을 걸었는데 비면 반경 밖 카페를 섞어 보여주지 않고, 가장 가까운 곳까지의 거리를 알려준다
+    const outside = q.radius && !list.length ? results(true) : [];
+    const nearD = outside.length ? Math.min(...outside.map((x) => x.d)) : null;
     const where = q.geo ? '내 주변' : `${q.sido} ${q.sigungu}`;
     const when = v.mode === 'HOURLY' ? `${fmtDate(v.date)} ${hh(v.start)}–${hh(v.end)}` : `${PLAN[v.plan]}`;
     const sorts = [['price', '최저가순'], ['distance', '거리순'], ['rating', '평점순'], ['diff', '평균 대비 저렴순']];
     const loading = !!S.regionLoading, noKakao = !S.kakao && !D.cafes.some((c) => c.sido === q.sido && c.sigungu === q.sigungu);
     const empty = loading ? `<li class="empty"><h3>카카오맵에서 ${esc(q.sigungu)} 스터디카페를 불러오는 중이에요</h3><p class="muted">처음 보는 지역은 몇 초 걸려요. 한 번 불러온 지역은 다음부터 바로 보여요.</p></li>`
       : noKakao ? `<li class="empty"><h3>이 지역은 카카오맵 연결이 필요해요</h3><p class="muted">지도를 불러오지 못해 실제 카페 정보를 가져올 수 없어요. 잠시 뒤 다시 시도해 주세요.</p></li>`
-      : q.geo && !q.fac.length && !q.nearStation && !q.nearUniv ? `<li class="empty"><h3>내 위치 ${NEAR_WIDEN_KM[NEAR_WIDEN_KM.length - 1]}km 안에서 불러온 카페가 없어요</h3><p class="muted">지역을 직접 골라 보세요.</p><button class="btn primary" data-act="geo">내 위치 해제하고 지역 고르기</button></li>`
+      : nearD != null ? `<li class="empty"><h3>반경 ${q.radius}km 안에는 카페가 없어요</h3><p class="muted">가장 가까운 카페는 ${S.me || q.geo ? '내 위치' : `${esc(q.sigungu)} 중심`}에서 ${km(nearD)} 떨어져 있어요.</p><button class="btn primary" data-act="noRadius">반경 제한 없음으로 보기</button></li>`
       : `<li class="empty"><h3>${q.fac.length ? '선택한 시설이 확인된 카페가 없어요' : '조건에 맞는 스터디카페가 없어요'}</h3><p class="muted">${q.fac.length ? '시설 정보 미확인은 시설이 없다는 뜻이 아니에요. 시설 조건을 해제하면 다른 카페도 볼 수 있어요.' : q.geo ? '내 주변에 카페가 없을 수 있어요. 지역을 직접 선택해 보세요.' : S.regionError === `${q.sido}|${q.sigungu}` ? '카카오맵에서 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.' : '이 지역에는 카카오맵에 등록된 스터디카페가 없거나, 조건에 맞는 곳이 없어요.'}</p><button class="btn primary" data-act="${q.fac.length ? 'clearFac' : 'reset'}">${q.fac.length ? '시설 조건 해제' : '조건 초기화'}</button></li>`;
     const hlIdx = list.findIndex((it) => it.c.id === S.hl);
     if (hlIdx >= S.limit) S.limit = hlIdx + 1; // 지도에서 고른 카페가 목록에 보이도록 목록을 그 위치까지 펼친다
@@ -747,9 +745,8 @@
     const t0 = !q.geo && S.regionTime.get(regKey(regionOf()));
     const asof = t0 && realMode() ? `카카오맵 ${ago(t0)} 기준` : '';
     const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.quick.map(([sd, sg]) => `<button class="chip" data-act="region" data-s="${esc(sd)}" data-g="${esc(sg)}" aria-pressed="${!q.geo && q.sido === sd && q.sigungu === sg}">${esc(sg)}</button>`).join('')}</div>`;
-    const nearNotice = nearestOnly && list.length ? `<div class="note" style="margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span>내 위치 반경 ${q.radius || NEAR_DEFAULT_KM}km 안에는 카페가 없어요. 반경 ${widened}km 안의 카페 ${list.length}곳을 가까운 순으로 보여드려요. (가장 가까운 곳: ${km(list[0].d)})</span><button class="btn sm" data-act="geo">내 위치 해제</button></div>` : ``;
     const facNote = q.fac.length ? `<p class="note" role="status">시설 조건: ${q.fac.map((f) => esc(FAC[f] || f)).join(' · ')} — 선택한 시설이 확인된 카페만 표시해요. 미확인 카페는 제외돼요.</p>` : '';
-    box.innerHTML = `${locNote}${realNote}${facNote}${nearNotice}${nearestOnly ? `` : avgStrip(list)}
+    box.innerHTML = `${locNote}${realNote}${facNote}${avgStrip(list)}
       <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}${asof ? ` · ${asof}` : ''}</small></div>
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
           <button class="tab map-toggle" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} ${q.view === 'map' ? '목록만 보기' : '지도로 보기'}</button></div></div>
@@ -861,7 +858,7 @@
         const key = regKey(regionOf());
         S.regionLoading = key; refreshMaps();
         // 이미 불러와 저장된 지역은 ensureRegion 이 바로 끝나므로, 끝나면 '불러오는 중' 표시를 반드시 끈다
-        (S.q.geo ? ensureNear(S.q.geo, S.q.radius || 5) : ensureRegion(regionOf())).finally(() => { if (S.regionLoading === key) S.regionLoading = null; onRealLoaded(); });
+        (S.q.geo ? ensureNear(S.q.geo, S.q.radius || NEAR_DEFAULT_KM) : ensureRegion(regionOf())).finally(() => { if (S.regionLoading === key) S.regionLoading = null; onRealLoaded(); });
       }
       else refreshMaps();
     };
@@ -1078,13 +1075,14 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden && !S.me && S.locFail === 'denied' && navigator.permissions) navigator.permissions.query({ name: 'geolocation' }).then((st) => { if (st.state === 'granted') retry(); }).catch(() => {}); });
   }
   // 내 위치 모드: 내 위치 주변(반경 안)에 걸친 시·군·구를 모두 불러온다 (너무 많으면 가까운 3곳)
-  function ensureNear(pt, km) {
-    const near = D.regions.map((r) => {
+  // 내 위치와 가까운 지역(최대 3곳)
+  function nearRegions(pt, km) {
+    return D.regions.map((r) => {
       const [x0, y0, x1, y1] = r.box, pad = km / 88;
       return { r, d: dist(pt, r.center), hit: pt[1] >= x0 - pad && pt[1] <= x1 + pad && pt[0] >= y0 - km / 111 && pt[0] <= y1 + km / 111 };
-    }).filter((x) => x.hit).sort((a, b) => a.d - b.d).slice(0, 3);
-    return Promise.all(near.map((x) => ensureRegion(x.r)));
+    }).filter((x) => x.hit).sort((a, b) => a.d - b.d).slice(0, 3).map((x) => x.r);
   }
+  function ensureNear(pt, km) { return Promise.all(nearRegions(pt, km).map((r) => ensureRegion(r))); }
 
   // =====================================================================================
   // 카페 상세 + ④ 예약
@@ -1581,10 +1579,11 @@
     clearFac: () => { S.q.fac = []; afterQuery(); },
     // ② 지역
     near: (t) => { S.q[t.dataset.k] = !S.q[t.dataset.k]; afterQuery(); },
+    noRadius: () => { S.q.radius = 0; afterQuery(); }, // 반경 제한 없음으로 되돌린다
     // '내 주변' 모드를 켜고 끈다. 끄면 고른 지역만 보여주되, 거리는 계속 현재 위치에서 잰다.
     geo: () => {
       if (S.q.geo) { S.q.geo = null; afterQuery(); return; }
-      const on = () => { S.q.geo = S.me; if (!S.q.radius) S.q.radius = 5; setCond(); afterQuery(); ensureNear(S.me, S.q.radius).finally(() => onRealLoaded()); };
+      const on = () => { S.q.geo = S.me; setCond(); afterQuery(); ensureNear(S.me, S.q.radius || NEAR_DEFAULT_KM).finally(() => onRealLoaded()); };
       if (S.me) { on(); return; }
       toast('위치를 확인하는 중이에요…');
       applyLocation().then((ok) => { if (ok) on(); });
@@ -1721,7 +1720,7 @@
       S.limit = PAGE;
       renderResults();
       if (k === 'sido' || k === 'sigungu') { rememberRegion(); const pr = ensureRegion(regionOf()); renderResults(); pr.finally(() => onRealLoaded()); } // 고른 구를 불러온다
-      else if (k === 'radius' && q.geo) ensureNear(q.geo, q.radius || 5).finally(() => onRealLoaded());
+      else if (k === 'radius' && q.geo) ensureNear(q.geo, q.radius || NEAR_DEFAULT_KM).finally(() => onRealLoaded());
     } else if (t.dataset.b) { // 예약 카드 입력
       const k = t.dataset.b, b = S.book, c = cafeById(b.cafeId);
       if (k === 'date') b.date = t.value || todayStr();
