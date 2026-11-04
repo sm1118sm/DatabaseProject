@@ -871,3 +871,7 @@ body { word-break: keep-all; overflow-wrap: break-word; } /* 한국어가 단어
 .dbadge { white-space: nowrap; }
 @media (max-width: 340px) { .dlead { display: none; } .dbadge { font-size: 12.5px; padding: 5px 9px; } }
 
+/* 잠긴 비교·추천 메뉴 안내 말풍선 */
+.navtip { position: fixed; z-index: 1000; background: var(--ink, #191f28); color: #fff; font-size: 13px; font-weight: 600; line-height: 1.4; padding: 8px 12px; border-radius: 10px; pointer-events: none; max-width: calc(100vw - 16px); white-space: nowrap; }
+.navtip[hidden] { display: none; }
+.navtip::before { content: ''; position: absolute; top: -5px; left: 50%; margin-left: -5px; border: 5px solid transparent; border-top: 0; border-bottom-color: var(--ink, #191f28); }

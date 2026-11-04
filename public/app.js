@@ -457,12 +457,27 @@
   const condReady = () => { try { return sessionStorage.getItem(COND_KEY) === '1'; } catch { return !!S.condReady; } };
   const setCond = () => { S.condReady = true; try { sessionStorage.setItem(COND_KEY, '1'); } catch { /* 저장소 사용 불가 */ } updateGate(); };
   const APPLIED = "고른 조건이 적용됐어요. 확인한 뒤 '이 조건으로 비교하기'를 눌러 주세요.";
-  const NEED_COND = '검색 조건에서 지역을 먼저 골라 주세요. 지역을 고르면 비교·추천이 열려요.';
+  const NEED_COND = '검색 조건을 먼저 입력해 주세요. 지역을 고르면 열려요.';
   const clearCond = () => { S.condReady = false; try { sessionStorage.removeItem(COND_KEY); } catch { /* 저장소 사용 불가 */ } updateGate(); };
+  // 잠긴 비교·추천 메뉴에 커서를 올리면(키보드 포커스도) 바로 아래에 안내 말풍선을 띄운다
+  let navTip = null;
+  function hideNavTip() { if (navTip) navTip.hidden = true; }
+  function showNavTip(btn) {
+    if (!navTip) { navTip = document.createElement('div'); navTip.className = 'navtip'; navTip.setAttribute('role', 'tooltip'); document.body.appendChild(navTip); }
+    navTip.textContent = NEED_COND; navTip.hidden = false;
+    const r = btn.getBoundingClientRect(), w = navTip.offsetWidth;
+    navTip.style.top = Math.round(r.bottom + 8) + 'px';
+    navTip.style.left = Math.round(Math.max(8, Math.min(r.left + r.width / 2 - w / 2, document.documentElement.clientWidth - w - 8))) + 'px';
+  }
+  const gateBtn = (e) => (e.target.closest ? e.target.closest('.mainnav [data-hash="compare"][aria-disabled="true"]') : null);
+  document.addEventListener('mouseover', (e) => { const b = gateBtn(e); if (b) showNavTip(b); });
+  document.addEventListener('mouseout', (e) => { if (gateBtn(e)) hideNavTip(); });
+  document.addEventListener('focusin', (e) => { const b = gateBtn(e); if (b) showNavTip(b); });
+  document.addEventListener('focusout', (e) => { if (gateBtn(e)) hideNavTip(); });
   function updateGate() {
     const on = condReady();
     document.querySelectorAll('.mainnav [data-hash="compare"]').forEach((b) => {
-      if (on) { b.removeAttribute('aria-disabled'); b.removeAttribute('title'); } else { b.setAttribute('aria-disabled', 'true'); b.title = NEED_COND; }
+      if (on) { b.removeAttribute('aria-disabled'); hideNavTip(); } else b.setAttribute('aria-disabled', 'true');
     });
   }
   function summaryHtml() {
