@@ -799,8 +799,10 @@
       S.kakao = status === 'ready';
       // 지도가 준비되면 카카오 장소 검색으로 실제 스터디카페를 불러온 뒤 화면을 갱신한다
       if (S.kakao) {
-        S.regionLoading = regKey(regionOf()); refreshMaps();
-        (S.q.geo ? ensureNear(S.q.geo, S.q.radius || 5) : ensureRegion(regionOf())).finally(() => onRealLoaded());
+        const key = regKey(regionOf());
+        S.regionLoading = key; refreshMaps();
+        // 이미 불러와 저장된 지역은 ensureRegion 이 바로 끝나므로, 끝나면 '불러오는 중' 표시를 반드시 끈다
+        (S.q.geo ? ensureNear(S.q.geo, S.q.radius || 5) : ensureRegion(regionOf())).finally(() => { if (S.regionLoading === key) S.regionLoading = null; onRealLoaded(); });
       }
       else refreshMaps();
     };
