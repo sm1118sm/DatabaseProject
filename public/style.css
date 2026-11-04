@@ -645,8 +645,8 @@ h1, h2, h3, .hero h1 { word-break: keep-all; }
 .bt-stat { grid-area: stat; background: var(--p-yellow); display: flex; flex-direction: column; justify-content: center; }
 .bt-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13.5px; }
 .bt-tag { padding: 3px 9px; border-radius: 99px; background: #fff; color: var(--cheap); font-size: 12px; font-weight: 800; white-space: nowrap; }
-.bt-price-n { margin: auto 0 12px; padding-top: 18px; font-size: 40px; font-weight: 800; letter-spacing: -1.4px; line-height: 1; }
-.bt-price-n small { display: block; margin-top: 6px; font-size: 13px; font-weight: 600; color: #5b6b85; letter-spacing: 0; }
+.bt-price-n { margin: auto 0 30px; padding-top: 18px; font-size: 40px; font-weight: 800; letter-spacing: -1.4px; line-height: 1; }
+.bt-price-n small { display: block; margin-top: 14px; font-size: 13px; font-weight: 600; color: #5b6b85; letter-spacing: 0; }
 .bt-bars { display: grid; gap: 6px; }
 .bt-bars i { display: block; height: 9px; border-radius: 9px; background: var(--blue); }
 .bt-bars i.avg { background: #cfe0fb; }
