@@ -182,6 +182,19 @@
     }
     return avgCache.get(k);
   }
+  // 평균 대비를 한눈에: 초록(저렴)·빨강(비쌈) 알약 + 이 카페와 지역 평균을 나란히 보여 주는 막대
+  const diffBadge = (diff, avg, small) => {
+    const cls = diff === 0 ? 'even' : diff < 0 ? 'low' : 'high';
+    const pct = avg ? Math.round((Math.abs(diff) / avg) * 100) : 0;
+    const lead = small ? '' : '평균보다 '; // 표 안에서는 짧게 (아래 안내 문구가 기준을 설명한다)
+    const t = diff === 0 ? '평균 수준' : diff < 0 ? `▼ ${lead}${won(-diff)} 저렴${pct ? ` (${pct}%)` : ''}` : `▲ ${lead}${won(diff)} 비쌈${pct ? ` (${pct}%)` : ''}`;
+    return `<span class="dbadge ${cls}${small ? ' sm' : ''}">${t}</span>`;
+  };
+  const diffBar = (p, avg, cls) => {
+    if (!avg) return '';
+    const mx = Math.max(p, avg) * 1.12;
+    return `<div class="dbar" aria-hidden="true"><i class="${cls}" style="width:${((p / mx) * 100).toFixed(1)}%"></i><b style="left:${((avg / mx) * 100).toFixed(1)}%"></b></div><div class="dcap"><span>이 카페 ${won(p)}</span><span>지역 평균 ${won(avg)}</span></div>`;
+  };
   const diffTag = (diff) => (diff === 0 ? ['even', '평균 수준'] : diff < 0 ? ['low', `평균보다 ${won(-diff)} 저렴`] : ['high', `평균보다 ${won(diff)} 비쌈`]);
 
   // ---- 거리 / 영업시간 ---------------------------------------------------------------
@@ -335,6 +348,11 @@
     ['24시간', 'moon', 'fac', 'h'], ['집중석', 'user', 'seat', 'FOCUS'], ['스터디룸', 'sofa', 'seat', 'ROOM'], ['스낵바', 'snack', 'fac', 's'],
     ['프린터', 'printer', 'fac', 'p'], ['역세권', 'train', 'near', 'nearStation'], ['대학가', 'school', 'near', 'nearUniv'], ['사물함', 'locker', 'fac', 'l'],
   ];
+  // 홈 타일: 눌렀을 때 실제로 결과가 나오는 조건만 둔다 (시설 정보는 카카오에 없어 확인된 카페가 거의 없다)
+  const HOME_TILES = [
+    ['내 주변', 'target', 'geo', 'geo'], ['최저가', 'card', 'sort', 'price'], ['평점 높은 곳', 'check', 'sort', 'rating'], ['평균보다 저렴', 'chart', 'sort', 'diff'],
+    ['집중석', 'user', 'seat', 'FOCUS'], ['스터디룸', 'sofa', 'seat', 'ROOM'], ['역세권', 'train', 'near', 'nearStation'], ['대학가', 'school', 'near', 'nearUniv'],
+  ];
   const catOn = (kind, val) => (kind === 'fac' ? S.q.fac.includes(val) : kind === 'seat' ? S.q.seat === val : S.q[val]);
   // 실제 장소 정보와 가상 시연 카페를 구분한다.
   const realMode = () => D.cafes.some((c) => c.real && (S.q.geo || (c.sido === S.q.sido && c.sigungu === S.q.sigungu)));
@@ -446,7 +464,7 @@
     const where = q.geo ? '내 주변' : `${q.sido} ${q.sigungu}`;
     const when = v.mode === 'HOURLY' ? `${fmtDate(q.date)} ${hh(q.start)}–${hh(q.end)}` : `${fmtDate(q.date)} 시작 · ${PLAN[q.plan]}`;
     const seat = q.people > 1 ? `스터디룸 ${q.people}명` : q.seat === 'ANY' ? '좌석 전체' : SEAT[q.seat];
-    const rows = [['지역', where], ['이용 형태', v.mode === 'HOURLY' ? '시간제' : '기간제'], ['일시', when], ['좌석', seat], ['시설', q.fac.length ? q.fac.map((k) => FAC[k]).join('·') : '선택 안 함'], ['거리', q.radius ? `반경 ${q.radius}km` : '제한 없음']];
+    const rows = [['지역', where], ['이용 형태', v.mode === 'HOURLY' ? '시간제' : '기간제'], ['일시', when], ['좌석', seat], ['시설', q.fac.length ? q.fac.map((k) => FAC[k]).join('·') : '선택 안 함'], ['거리', q.radius ? `반경 ${q.radius}km` : '제한 없음'], ['정렬', { price: '최저가순', distance: '거리순', rating: '평점순', diff: '평균 대비 저렴순' }[q.sort] || '최저가순']];
     return `<h3>선택한 조건</h3><dl>${rows.map(([k, t]) => `<div><dt>${k}</dt><dd>${esc(t)}</dd></div>`).join('')}</dl>
       <button class="btn primary lg block" data-act="runCompare">이 조건으로 비교하기 →</button>
       ${condReady() ? '' : '<p class="note gatenote">이 버튼을 누르면 비교·추천 메뉴가 열려요.</p>'}
@@ -528,7 +546,7 @@
         </div>
         <div aria-hidden="true">
           <div class="hm-bento">
-            <div class="bt bt-price"><div class="bt-top"><b>스터디카페 예시</b><span class="bt-tag">평균보다 저렴</span></div><div class="bt-price-n">1,700원<small>시간당 요금</small></div><div class="bt-bars"><i style="width:58%"></i><i class="avg" style="width:86%"></i></div><div class="bt-cap"><span>이 카페</span><span>지역 평균</span></div></div>
+            <div class="bt bt-price"><div class="bt-top"><b>스터디카페 예시</b><span class="bt-tag">▼ 1,185원 저렴 (41%)</span></div><div class="bt-price-n">1,700원<small>시간당 요금</small></div><div class="bt-bars"><i style="width:58%"></i><i class="avg" style="width:86%"></i></div><div class="bt-cap"><span>이 카페</span><span>지역 평균</span></div></div>
             <div class="bt bt-seat"><div class="bt-top"><b>실시간 좌석</b><span class="bt-n">잔여 24/30석</span></div><div class="bt-grid">${seats}</div></div>
             <div class="bt bt-ok"><span class="bt-check">${ico('check', 18)}</span><div><b>예약이 완료됐어요</b><small>일반석 12번 · 18:00–21:00</small></div></div>
           </div>
@@ -546,7 +564,7 @@
 
     <section class="section hm-sec rv"><div class="wrap">
       <div class="hm-head"><span class="pg-kicker">바로 찾기</span><h2>어떤 스터디카페를<br>찾고 있나요?</h2><p>눌러서 조건을 켜고 바로 비교해 보세요.</p></div>
-      <div class="hm-tiles">${CATS.map(([t, ic, kind, val]) => `<button class="hm-cat" data-act="homeCat" data-kind="${kind}" data-v="${val}"><span class="hm-ti">${ico(ic, 22)}</span><b>${t}</b></button>`).join('')}</div>
+      <div class="hm-tiles">${HOME_TILES.map(([t, ic, kind, val]) => `<button class="hm-cat" data-act="homeCat" data-kind="${kind}" data-v="${val}"><span class="hm-ti">${ico(ic, 22)}</span><b>${t}</b></button>`).join('')}</div>
     </div></section>
 
     <section class="section hm-sec rv"><div class="wrap">
@@ -556,7 +574,7 @@
 
     <section class="section rv"><div class="wrap"><div class="hm-band">
       <div><b>${D.regions.length}</b><span>비교 가능한 지역</span></div>
-      <div><b>7종</b><span>시설 조건 필터</span></div>
+      <div><b>평균 대비</b><span>시·군·구별 요금 비교</span></div>
       <div><b>4가지</b><span>결제 수단</span></div>
       <div><b>100%</b><span>1시간 전까지 환불</span></div>
     </div></div></section>
@@ -629,7 +647,7 @@
 
   function cardHtml(it, idx) {
     const { c, p, d, avg, diff, av, r } = it, v = qView();
-    const [cls, tag] = diffTag(diff);
+    const [cls] = diffTag(diff);
     const pct = clamp(50 + (avg ? (diff / avg) * 100 : 0), 5, 95);
     const rank = S.q.sort === 'price' && idx < 3 ? `<span class="tag rank">최저가 ${idx + 1}위</span>` : '';
     const seats = `<span data-seat-cafe="${c.id}">${listSeatsHtml(c, v)}</span>`;
@@ -641,7 +659,8 @@
         <div class="cloc"><span>${ico('pin', 14)}${esc(c.sigungu)} · ${km(d)}</span>${where}</div>
         <div class="crate">${r.n ? `<span class="star">★</span> ${r.avg.toFixed(1)} <span class="muted">(${r.n})</span>` : '<span class="muted">후기 없음</span>'}</div>
         <div class="cfac">${c.fac.filter((f) => f !== 'h').slice(0, 4).map((f) => `<span>${FAC[f]}</span>`).join('')}</div>
-        <div class="cprice"><span class="p">${v.mode === 'HOURLY' ? '시간당' : PLAN[v.plan]}${c.real ? ' (예시)' : ''} <b>${won(p)}</b><small class="cavg">${tag}</small></span>${seats}</div>
+        <div class="cdiff">${diffBadge(diff, avg)}${diffBar(p, avg, cls)}</div>
+        <div class="cprice"><span class="p">${v.mode === 'HOURLY' ? '시간당' : PLAN[v.plan]}${c.real ? ' (예시)' : ''} <b>${won(p)}</b></span>${seats}</div>
       </div></li>`;
   }
 
@@ -649,7 +668,7 @@
   function selHtml(list, v) {
     const it = list.find((x) => x.c.id === S.hl);
     if (!it) return '';
-    const { c, p, d, av } = it;
+    const { c, p, d, av, avg, diff } = it;
     const meta = [`${esc(c.sigungu)} · ${km(d)}`, c.phone ? esc(c.phone) : ''].filter(Boolean).join(' · ');
     const seats = `<span data-seat-cafe="${c.id}">${listSeatsHtml(c, v)}</span>`;
     return `<div class="selcafe" id="selcafe" role="region" aria-label="지도에서 선택한 스터디카페">
@@ -659,6 +678,7 @@
       <div class="seladdr">${ico('pin', 14)}${esc(c.addr)}</div>
       <div class="selmeta">${meta}</div>
       <div class="selprice">${v.mode === 'HOURLY' ? '시간당' : PLAN[v.plan]}${c.real ? ' (예시)' : ''} <b>${won(p)}</b><span class="muted"> · ${seats}</span></div>
+      <div class="cdiff">${diffBadge(diff, avg)}${diffBar(p, avg, diffTag(diff)[0])}</div>
       <div class="selbtns"><button class="btn primary sm" data-act="open" data-id="${c.id}">상세·예약</button>${c.url ? `<a class="btn sm" href="${esc(c.url)}" target="_blank" rel="noopener">카카오맵에서 보기 ↗</a>` : ''}</div>
     </div>`;
   }
@@ -1081,12 +1101,12 @@
     const cell = (type, mode, plan) => {
       const p = price(c, type, mode, plan);
       if (p == null) return '<td class="muted">–</td>';
-      const [cls, t] = diffTag(p - regionAvg(c, type, mode, plan));
-      return `<td><span class="pv">${won(p)}</span>${mode === 'HOURLY' ? `<small class="diff">${t}</small>` : ''}</td>`;
+      const avg = regionAvg(c, type, mode, plan);
+      return `<td><span class="pv">${won(p)}</span>${avg ? diffBadge(p - avg, avg, true) : ''}</td>`;
     };
     return `<div class="tablewrap"><table class="price"><thead><tr><th>구분</th><th>시간제 (1시간)</th><th>1일권</th><th>주간권 (7일)</th><th>월간권 (30일)</th></tr></thead><tbody>
       ${['NORMAL', 'FOCUS', 'ROOM'].map((t) => `<tr><td>${SEAT[t]}${t === 'ROOM' ? `<small class="muted">최대 ${c.roomCap}인</small>` : ''}</td>${cell(t, 'HOURLY')}${cell(t, 'PERIOD', 'DAY')}${cell(t, 'PERIOD', 'WEEK')}${cell(t, 'PERIOD', 'MONTH')}</tr>`).join('')}
-      </tbody></table></div><p class="muted" style="font-size:12.5px;margin:8px 0 0">시간제 금액 아래 작은 글씨는 ${esc(c.sigungu)} 안의 같은 좌석 유형 평균과 비교한 금액이에요.</p>`;
+      </tbody></table></div><p class="muted" style="font-size:12.5px;margin:8px 0 0">금액 아래 초록·빨간 표시는 ${esc(c.sigungu)} 안의 같은 좌석 유형 평균과 비교한 금액과 비율이에요. (초록=평균보다 저렴, 빨강=평균보다 비쌈)</p>`;
   }
   function reviewBlock(c) {
     const l = reviewsOf(c), r = ratingOf(c);
@@ -1466,10 +1486,22 @@
     runCompare: () => { setCond(); if (location.hash === '#compare') route(); else location.hash = 'compare'; }, // '이 조건으로 비교하기'
     // 옛 메뉴 이름(sec-*)도 새 화면 주소로 연결한다
     nav: (t) => { const h = { 'sec-opt': 'search', 'sec-area': 'area', 'sec-compare': 'compare', 'sec-flow': 'guide' }[t.dataset.to] || 'home'; if (location.hash === '#' + h) route(); else location.hash = h; },
-    homeCat: (t) => { // 홈의 인기 카테고리: 조건을 켜고 비교 화면으로 간다
+    homeCat: (t) => { // 홈의 타일: 고른 조건을 검색 조건에 적용하고 그 화면으로 간다 (바로 비교하지 않는다)
       const { kind, v } = t.dataset;
-      if (kind === 'fac') { if (!S.q.fac.includes(v)) S.q.fac.push(v); } else if (kind === 'seat') { S.q.seat = v; S.q.people = 1; } else S.q[v] = true;
-      S.limit = PAGE; toast(APPLIED); location.hash = 'search'; // 바로 비교하지 않고 검색 조건에서 확인하게 한다
+      S.limit = PAGE;
+      if (kind === 'geo') { // 내 주변: 위치를 확인한 뒤 내 위치 기준으로
+        location.hash = 'search';
+        if (S.q.geo) { toast('내 위치 기준으로 적용돼 있어요.'); return; }
+        const done = () => { ACT.geo(); toast(APPLIED); };
+        if (S.me) { done(); return; }
+        toast('위치를 확인하는 중이에요…');
+        // 페이지가 열릴 때 시작한 위치 확인이 아직 진행 중이면 그 결과를 기다린다 (바로 실패로 안내하지 않는다)
+        const waitLoc = () => new Promise((res) => { const t0 = Date.now(); const tick = () => { if (!S.locating || Date.now() - t0 > 12000) res(!!S.me); else setTimeout(tick, 200); }; tick(); });
+        (S.locating ? waitLoc() : applyLocation()).then((ok) => { if (ok) done(); else toast(S.locFail === 'denied' ? '위치 권한이 꺼져 있어요. 주소창의 자물쇠에서 위치를 허용해 주세요.' : '현재 위치를 확인하지 못했어요. 지역을 직접 골라 주세요.'); });
+        return;
+      }
+      if (kind === 'fac') { if (!S.q.fac.includes(v)) S.q.fac.push(v); } else if (kind === 'seat') { S.q.seat = v; S.q.people = 1; } else if (kind === 'sort') S.q.sort = v; else S.q[v] = true;
+      toast(APPLIED); location.hash = 'search';
     },
     soon: () => toast('준비 중인 페이지예요.'),
     closeModal,
