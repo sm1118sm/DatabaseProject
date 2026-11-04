@@ -1332,7 +1332,7 @@
 
   function showReservations() {
     const u = me();
-    const head = '<div class="wrap"><div class="pagehead"><h1>내 예약</h1><p class="muted" style="margin:4px 0 0">예약 내역을 확인하고 변경·취소하거나 후기를 남길 수 있어요.</p></div>';
+    const head = pageHead('MY', '내 예약', '예약 내역을 확인하고 변경·취소하거나 후기를 남길 수 있어요.') + '<div class="wrap" style="padding-top:24px">';
     if (!u) {
       view.innerHTML = `${head}<div class="empty" style="margin-bottom:40px"><h3>로그인이 필요해요</h3><p class="muted">로그인하면 예약 내역을 볼 수 있어요.</p><button class="btn primary" data-act="login">로그인</button></div></div>`;
       S.pending = showReservations; window.scrollTo(0, 0); return;
