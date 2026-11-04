@@ -1184,8 +1184,8 @@
   function renderUser() {
     const u = me(), box = $('#userbox');
     box.innerHTML = u
-      ? `<span class="hello">${esc(u.name)}님</span><span class="pts">${u.points.toLocaleString('ko-KR')}P</span><button class="btn sm" data-act="logout">로그아웃</button>`
-      : '<button class="btn sm" data-act="login">로그인</button><button class="btn sm primary" data-act="signup">회원가입</button>';
+      ? `<button class="btn sm ghost" data-act="goto" data-hash="reservations">내 예약</button><span class="hello">${esc(u.name)}님</span><span class="pts">${u.points.toLocaleString('ko-KR')}P</span><button class="btn sm" data-act="logout">로그아웃</button>`
+      : '<button class="btn sm ghost" data-act="goto" data-hash="reservations">내 예약</button><button class="btn sm" data-act="login">로그인</button><button class="btn sm primary" data-act="signup">회원가입</button>';
   }
   // 카카오·네이버 버튼. 서버가 있고 키가 설정돼 있으면 실제 로그인으로 이동하고, 아니면 이유를 안내한다.
   const KAKAO_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7l-1 3.6c-.1.3.3.6.6.4l4.2-2.8c.5.1 1 .1 1.5.1 5.5 0 10-3.6 10-8S17.5 3 12 3z" fill="#191919"/></svg>';
@@ -1614,7 +1614,7 @@
     else { showHome(); window.scrollTo(0, 0); }
     // 지금 보고 있는 메뉴를 상단에 표시한다 (카페 상세는 '비교·추천'에 속한다)
     const on = h.startsWith('cafe-') ? 'compare' : (h === 'options' || h === 'area') ? 'search' : h || 'home';
-    document.querySelectorAll('.mainnav button').forEach((b) => { if (b.dataset.hash === on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    document.querySelectorAll('.mainnav button, .userbox [data-hash]').forEach((b) => { if (b.dataset.hash === on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   }
   window.addEventListener('hashchange', () => { closeModal(); route(); });
   document.addEventListener('change', () => setTimeout(refreshSide, 0)); // 조건이 바뀌면 '선택한 조건' 카드도 따라 바뀐다

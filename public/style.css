@@ -753,3 +753,10 @@ h1, h2, h3, .hero h1 { word-break: keep-all; }
   .gd-refund { flex-direction: column; align-items: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) { .flow .flowcard { transition: none; } .flow .flowcard:hover { transform: none; } }
+
+/* ---- 내 예약(로그인 영역)과 이용 안내(맨 위 안내줄) ---- */
+.userbox .ghost { border-color: transparent; background: transparent; font-weight: 700; color: var(--espresso-2); }
+.userbox .ghost:hover { background: var(--gold-soft); border-color: transparent; }
+.userbox .ghost[aria-current="page"] { color: var(--gold-deep); background: var(--gold-soft); }
+.utility .ulink { background: none; border: none; padding: 0; font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.utility .ulink:hover { color: var(--gold-deep); }
