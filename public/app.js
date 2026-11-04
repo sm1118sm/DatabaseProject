@@ -429,8 +429,27 @@
       <div class="sum-act"><button class="btn sm" data-act="goto" data-hash="options">조건 바꾸기</button><button class="btn sm" data-act="reset">초기화</button></div>
     </div>`;
   }
+  function sideSummaryHtml() {
+    const q = S.q, v = qView();
+    const where = q.geo ? '내 주변' : `${q.sido} ${q.sigungu}`;
+    const when = v.mode === 'HOURLY' ? `${fmtDate(q.date)} ${hh(q.start)}–${hh(q.end)}` : `${fmtDate(q.date)} 시작 · ${PLAN[q.plan]}`;
+    const seat = q.people > 1 ? `스터디룸 ${q.people}명` : q.seat === 'ANY' ? '좌석 전체' : SEAT[q.seat];
+    const rows = [['지역', where], ['이용 형태', v.mode === 'HOURLY' ? '시간제' : '기간제'], ['일시', when], ['좌석', seat], ['시설', q.fac.length ? q.fac.map((k) => FAC[k]).join('·') : '선택 안 함'], ['거리', q.radius ? `반경 ${q.radius}km` : '제한 없음']];
+    return `<h3>선택한 조건</h3><dl>${rows.map(([k, t]) => `<div><dt>${k}</dt><dd>${esc(t)}</dd></div>`).join('')}</dl>
+      <button class="btn primary lg block" data-act="goto" data-hash="compare">이 조건으로 비교하기 →</button>
+      <button class="btn block" data-act="reset" style="margin-top:8px">조건 초기화</button>`;
+  }
   function panelHtml() {
     if (curPage === 'compare') return summaryHtml();
+    if (curPage === 'search') {
+      const t = document.createElement('div'); t.innerHTML = panelFull();
+      const q = (s) => t.querySelector(s), g = t.querySelectorAll('.pgroup');
+      const note = q('.sb-note') ? q('.sb-note').outerHTML : '';
+      return `<section class="scard"><div class="scard-h"><span class="hm-fi f1">${ico('calendar', 22)}</span><div><h2>이용 옵션</h2><p>언제, 어떤 자리를 쓸지 골라 보세요.</p></div></div>
+        <div class="sbar sbar-3">${q('.sb-mode').outerHTML}${q('#qDate').closest('.sb-cell').outerHTML}${q('#optTime').outerHTML}</div>${note}<div class="pg-one">${g[0].outerHTML}</div></section>
+        <section class="scard" id="scard-area"><div class="scard-h"><span class="hm-fi f2">${ico('pin', 22)}</span><div><h2>지역 설정</h2><p>동네를 고르거나 내 위치로 가까운 곳을 찾아보세요.</p></div></div>
+        <div class="sbar sbar-1">${q('#sec-area').outerHTML}</div><div class="pg-one">${g[1].outerHTML}</div></section>`;
+    }
     if (curPage !== 'options' && curPage !== 'area') return panelFull();
     // 기존 검색 패널의 조각(같은 id·같은 이벤트)을 그대로 가져와 화면별로 나눠 담는다
     const t = document.createElement('div'); t.innerHTML = panelFull();
@@ -441,24 +460,21 @@
     }
     return `<div class="sbar sbar-1">${q('#sec-area').outerHTML}</div><div class="pg-one">${g[1].outerHTML}</div>`;
   }
-  const refreshPanel = () => { const p = $('#panel'); if (p) p.innerHTML = panelHtml(); };
+  const refreshSide = () => { const s = $('#sidesum'); if (s) s.innerHTML = sideSummaryHtml(); };
+  const refreshPanel = () => { const p = $('#panel'); if (p) p.innerHTML = panelHtml(); refreshSide(); };
 
   const pageHead = (step, title, desc) => `<section class="pghead"><div class="wrap"><span class="pg-kicker">${step}</span><h1>${title}</h1><p>${desc}</p></div></section>`;
   const stepNav = (prev, next) => `<div class="wrap"><div class="pg-cta">${prev ? `<button class="btn lg" data-act="goto" data-hash="${prev[0]}">← ${prev[1]}</button>` : '<span></span>'}${next ? `<button class="btn primary lg" data-act="goto" data-hash="${next[0]}">${next[1]} →</button>` : ''}</div></div>`;
 
-  function showOptions() {
-    curPage = 'options';
-    view.innerHTML = pageHead('STEP 1', '이용 옵션', '언제, 어떤 자리를 쓸지 골라 보세요. 고른 조건은 비교 결과에 바로 반영돼요.')
-      + `<div class="wrap"><div class="panel panel-page" id="panel">${panelHtml()}</div></div>` + stepNav(null, ['area', '지역 설정']);
-  }
-  function showArea() {
-    curPage = 'area';
-    view.innerHTML = pageHead('STEP 2', '지역 설정', '찾고 싶은 동네를 고르거나 내 위치로 가까운 곳을 찾아보세요.')
-      + `<div class="wrap"><div class="panel panel-page" id="panel">${panelHtml()}</div></div>` + stepNav(['options', '이용 옵션'], ['compare', '이 조건으로 비교하기']);
+  function showSearch(focusArea) {
+    curPage = 'search';
+    view.innerHTML = pageHead('STEP 1', '검색 조건', '이용 옵션과 지역을 정하면 아래 비교 화면에서 바로 결과를 볼 수 있어요.')
+      + `<div class="wrap"><div class="slayout"><div class="spanel" id="panel">${panelHtml()}</div><aside class="sidesum" id="sidesum">${sideSummaryHtml()}</aside></div></div>`;
+    if (focusArea) { const el = $('#scard-area'); if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); }
   }
   function showCompare() {
     curPage = 'compare';
-    view.innerHTML = pageHead('STEP 3', '비교·추천', '지역 평균 요금과 비교해 가장 알맞은 스터디카페를 찾아보세요.')
+    view.innerHTML = pageHead('STEP 2', '비교·추천', '지역 평균 요금과 비교해 가장 알맞은 스터디카페를 찾아보세요.')
       + `<div class="wrap"><div class="panel sumpanel" id="panel">${panelHtml()}</div></div>
       <section class="section section-tight"><div class="wrap"><div class="cats" id="cats">${catsHtml()}</div></div></section>
       <section class="section" id="sec-compare"><div class="wrap"><div id="results"></div></div></section>`;
@@ -468,7 +484,7 @@
     curPage = 'guide';
     const reviewBlock = recentReviews(), realCount = D.cafes.filter((c) => c.real).length;
     view.innerHTML = pageHead('이용 안내', '이렇게 이용하세요', '스터디모아의 4단계 이용 흐름을 한눈에 확인해 보세요.')
-      + `<section class="section section-tight"><div class="wrap">${flowHtml()}</div></section>`
+      + `<section class="section section-tight"><div class="wrap">${flowHtml()}<div class="gd-refund"><span class="hm-fi f4">${ico('card', 22)}</span><div><b>환불 규정</b><p>시간제는 이용 1시간 전까지 <b>100% 환불</b>, 이후에는 <b>50% 환불</b>돼요. 기간제는 이용 시작 전 100% 환불돼요. 포인트로 결제했다면 같은 금액을 포인트로 돌려드려요.</p></div></div></div></section>`
       + (reviewBlock ? `<section class="section"><div class="wrap"><div class="sec-head"><div><h2>최근 이용 후기</h2><p>${realCount ? '이 사이트에서 남긴 후기' : '샘플 후기'}</p></div></div><div class="revgrid">${reviewBlock}</div></div></section>` : '')
       + `<section class="section"><div class="wrap"><div class="hm-final"><h2>준비됐다면 바로 시작해 보세요</h2><p>우리 동네 스터디카페를 평균 요금과 비교해 볼 수 있어요.</p><div class="hm-cta"><button class="btn lg hm-white" data-act="goto" data-hash="options">지금 시작하기</button></div></div></div></section>`;
   }
@@ -1406,7 +1422,7 @@
     home: (t, e) => { e.preventDefault(); location.hash = 'home'; if (!$('#panel')) return; window.scrollTo(0, 0); },
     goto: (t) => { const h = t.dataset.hash; if (location.hash === '#' + h) route(); else location.hash = h; },
     // 옛 메뉴 이름(sec-*)도 새 화면 주소로 연결한다
-    nav: (t) => { const h = { 'sec-opt': 'options', 'sec-area': 'area', 'sec-compare': 'compare', 'sec-flow': 'guide' }[t.dataset.to] || 'home'; if (location.hash === '#' + h) route(); else location.hash = h; },
+    nav: (t) => { const h = { 'sec-opt': 'search', 'sec-area': 'area', 'sec-compare': 'compare', 'sec-flow': 'guide' }[t.dataset.to] || 'home'; if (location.hash === '#' + h) route(); else location.hash = h; },
     homeCat: (t) => { // 홈의 인기 카테고리: 조건을 켜고 비교 화면으로 간다
       const { kind, v } = t.dataset;
       if (kind === 'fac') { if (!S.q.fac.includes(v)) S.q.fac.push(v); } else if (kind === 'seat') { S.q.seat = v; S.q.people = 1; } else S.q[v] = true;
@@ -1418,7 +1434,7 @@
     // ① 이용 옵션
     adv: () => { S.adv = !S.adv; refreshPanel(); },
     facmore: () => { S.facMore = !S.facMore; refreshPanel(); },
-    goArea: () => { if (location.hash !== '#area') location.hash = 'area'; else { const sel = $('#qSido'); if (sel) sel.focus(); } },
+    goArea: () => { if (!/^#(area|options|search)$/.test(location.hash)) location.hash = 'area'; else { const sel = $('#qSido'); if (sel) sel.focus(); } },
     locRetry: () => { S.locFail = null; toast('위치를 확인하는 중이에요…'); applyLocation(); },
     locHelp: () => openModal(`<h2>내 위치 허용하기</h2><p class="muted" style="margin:0 0 14px">한 번 거부하면 사이트가 다시 물어볼 수 없어서, 브라우저에서 직접 바꿔야 해요.</p>
       <ol style="margin:0;padding-left:20px;display:grid;gap:10px;font-size:14px">
@@ -1592,16 +1608,16 @@
     curPage = h.startsWith('cafe-') ? 'cafe' : h || 'home';
     if (h.startsWith('cafe-')) showCafe(Number(h.slice(5)));
     else if (h === 'reservations') { if (API.on && me()) loadMyRes().finally(showReservations); else showReservations(); } // 서버 모드는 최신 예약을 불러온 뒤 그린다
-    else if (h === 'options') { showOptions(); window.scrollTo(0, 0); }
-    else if (h === 'area') { showArea(); window.scrollTo(0, 0); }
+    else if (h === 'options' || h === 'area' || h === 'search') { showSearch(h === 'area'); if (h !== 'area') window.scrollTo(0, 0); }
     else if (h === 'compare') { showCompare(); window.scrollTo(0, 0); }
     else if (h === 'guide') { showGuide(); window.scrollTo(0, 0); }
     else { showHome(); window.scrollTo(0, 0); }
     // 지금 보고 있는 메뉴를 상단에 표시한다 (카페 상세는 '비교·추천'에 속한다)
-    const on = h.startsWith('cafe-') ? 'compare' : h || 'home';
+    const on = h.startsWith('cafe-') ? 'compare' : (h === 'options' || h === 'area') ? 'search' : h || 'home';
     document.querySelectorAll('.mainnav button').forEach((b) => { if (b.dataset.hash === on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   }
   window.addEventListener('hashchange', () => { closeModal(); route(); });
+  document.addEventListener('change', () => setTimeout(refreshSide, 0)); // 조건이 바뀌면 '선택한 조건' 카드도 따라 바뀐다
   window.addEventListener('online', recoverSession);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) recoverSession(); });
 
