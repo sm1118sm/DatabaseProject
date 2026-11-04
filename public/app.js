@@ -411,7 +411,7 @@
             ${q.people > 1 ? '<p class="note">2인 이상은 스터디룸만 예약할 수 있어요.</p>' : ''}</div></div>
           <div class="field" style="margin-bottom:0"><span class="lbl">시설 옵션</span><div class="chips">
             ${facShown.map(([k, t]) => `<button class="chip" data-act="fac" data-v="${k}" aria-pressed="${q.fac.includes(k)}">${ico(FACICO[k], 15)}${t}</button>`).join('')}${facHidden > 0 ? `<button class="chip more" data-act="facmore">+ 더보기 ${facHidden}</button>` : S.facMore ? '<button class="chip more" data-act="facmore">접기</button>' : ''}</div>
-            ${realMode() ? '<p class="note" style="margin-top:8px">시설 조건을 선택하면 해당 시설이 확인된 카페만 표시해요. 카카오 장소 검색에는 시설·운영 시간 정보가 없어, 미확인 카페는 결과에서 제외돼요.</p>' : ''}</div>
+            ${realMode() ? '<p class="note" style="margin-top:8px">시설은 카카오에 정보가 없어 <b>예시</b>로 부여한 값이에요(실제와 다를 수 있어요). 24시간만 카페 이름에 표기된 경우에 적용돼요.</p>' : ''}</div>
         </div>
         <div class="pgroup">
           <h3>거리·주변</h3>
@@ -455,7 +455,7 @@
     const seat = q.people > 1 ? `스터디룸 ${q.people}명` : q.seat === 'ANY' ? '좌석 전체' : SEAT[q.seat];
     const chip = (hash, icon, text) => `<button class="sumchip" data-act="goto" data-hash="${hash}">${ico(icon, 15)}${esc(text)}</button>`;
     return `<div class="sum">
-      <div class="sum-chips">${chip('area', 'pin', where)}${chip('options', 'clock', when)}${chip('options', 'user', seat)}${q.fac.length ? chip('options', 'check', q.fac.map((k) => FAC[k]).join('·')) : ''}${q.radius ? chip('area', 'target', `반경 ${q.radius}km`) : ''}</div>
+      <div class="sum-chips">${chip('area', 'pin', where)}${chip('options', 'clock', when)}${chip('options', 'user', seat)}${q.fac.length ? chip('options', 'check', q.fac.map((k) => FAC[k]).join('·') + (realMode() && q.fac.some((k) => k !== 'h') ? ' (예시)' : '')) : ''}${q.radius ? chip('area', 'target', `반경 ${q.radius}km`) : ''}</div>
       <div class="sum-act"><button class="btn sm" data-act="goto" data-hash="options">조건 바꾸기</button><button class="btn sm" data-act="reset">초기화</button></div>
     </div>`;
   }
@@ -653,12 +653,12 @@
     const seats = `<span data-seat-cafe="${c.id}">${listSeatsHtml(c, v)}</span>`;
     const where = [c.station ? `<span>${ico('train', 14)}${esc(c.station)}</span>` : '', c.univ ? `<span>${ico('school', 14)}${esc(c.univ)}</span>` : ''].join('');
     return `<li class="card${S.hl === c.id ? ' hl' : ''}" id="card-${c.id}" data-act="open" data-id="${c.id}">
-      <div class="thumbbox">${photo(c, 0)}<div class="tags">${rank}${c.fac.includes('h') ? '<span class="tag">24시간</span>' : ''}${c.real ? '<span class="tag">요금 예시</span>' : ''}</div></div>
+      <div class="thumbbox">${photo(c, 0)}<div class="tags">${rank}${c.fac.includes('h') ? `<span class="tag">24시간${c.real ? ' (이름 기준)' : ''}</span>` : ''}${c.real ? '<span class="tag">요금 예시</span>' : ''}</div></div>
       <div class="cbody">
         <div class="cname">${esc(c.name)}</div>
         <div class="cloc"><span>${ico('pin', 14)}${esc(c.sigungu)} · ${km(d)}</span>${where}</div>
         <div class="crate">${r.n ? `<span class="star">★</span> ${r.avg.toFixed(1)} <span class="muted">(${r.n})</span>` : '<span class="muted">후기 없음</span>'}</div>
-        <div class="cfac">${c.fac.filter((f) => f !== 'h').slice(0, 4).map((f) => `<span>${FAC[f]}</span>`).join('')}</div>
+        <div class="cfac">${c.real && c.fac.some((f) => f !== 'h') ? '<span class="exlab">시설 예시</span>' : ''}${c.fac.filter((f) => f !== 'h').slice(0, 4).map((f) => `<span>${FAC[f]}</span>`).join('')}</div>
         <div class="cdiff">${diffBadge(diff, avg)}${diffBar(p, avg, cls)}</div>
         <div class="cprice"><span class="p">${v.mode === 'HOURLY' ? '시간당' : PLAN[v.plan]}${c.real ? ' (예시)' : ''} <b>${won(p)}</b></span>${seats}</div>
       </div></li>`;
@@ -876,23 +876,34 @@
   // 카카오 주소(예: '서울 강남구 역삼동', '충남 천안시 서북구 ...')가 이 시·군·구에 속하는지
   // 시·도는 전체 이름('세종특별자치시', '강원특별자치도')이나 줄임말('충북', '경기') 어느 쪽으로 시작해도 인정한다. 세종은 시·군·구가 없다.
   const addrOk = (addr, r) => [r.sido, ...(D.ALIAS[r.sido] || [])].some((a) => addr.startsWith(a)) && (r.sigungu === r.sido || new RegExp(`(^| )${r.sigungu}( |$)`).test(addr));
+  // 시설은 카카오에 정보가 없어서, 요금·좌석 수처럼 '예시'를 카페마다 고정된 무작위로 붙인다 (화면에 '예시'로 표시).
+  // 24시간만은 무작위로 주지 않고, 카페 이름에 24시가 적힌 경우에만 '이름 기준'으로 붙인다.
+  const EX_FAC = [['s', 0.45], ['p', 0.4], ['l', 0.35], ['e', 0.55], ['g', 0.25], ['w', 0.12]];
+  function exampleFac(c) {
+    if (!c.real || Array.isArray(c.facEx)) return c;
+    const ex = EX_FAC.filter(([k, pr]) => hash(`${c.id}|fac|${k}`) < pr).map(([k]) => k);
+    c.facEx = ex;
+    c.fac = [...(/24\s*시|24\s*[Hh]/.test(c.name || '') ? ['h'] : []), ...ex];
+    return c;
+  }
+  const facNote = (c, f) => (!c.real ? '' : f === 'h' ? '이름 기준' : '예시');
   function fromPlace(p, region) {
     const id = Number(p.id), r = (k) => hash(`${id}|${k}`);
-    return {
+    return exampleFac({
       id, real: true, name: p.place_name, sido: region.sido, sigungu: region.sigungu,
       addr: p.road_address_name || p.address_name, lat: Number(p.y), lng: Number(p.x), phone: p.phone || '', url: p.place_url || '',
       open: 0, close: 24, busy: 0.6 + r('b') * 0.4, roomCap: r('c') < 0.5 ? 4 : 6,
       seats: { NORMAL: 30 + Math.floor(r('a') * 40), FOCUS: 8 + Math.floor(r('f') * 16), ROOM: 2 + Math.floor(r('r') * 3) },
       fac: [], station: null, univ: null, reviews: [],
       price: D.makePrice(Math.round((1700 + r('n') * 2300) / 100) * 100),
-    };
+    });
   }
   function applyRegion(reg, real) { // 이 지역의 샘플 카페는 빼서 보관하고, 실제 카페를 넣는다
     for (let i = D.cafes.length - 1; i >= 0; i--) {
       const c = D.cafes[i];
       if (!c.real && c.sido === reg.sido && c.sigungu === reg.sigungu) archived.push(...D.cafes.splice(i, 1));
     }
-    real.forEach((c) => { if (!D.cafes.some((x) => x.id === c.id)) D.cafes.push(c); });
+    real.forEach((c) => { exampleFac(c); if (!D.cafes.some((x) => x.id === c.id)) D.cafes.push(c); });
     // 경계 상자의 한가운데는 산이나 바다일 수 있어서, 대표 역이 정해지지 않은 지역은 카페가 모인 곳의 중심을 거리 기준으로 쓴다
     if (real.length && /중심$/.test(reg.label)) {
       reg.center = [real.reduce((s, c) => s + c.lat, 0) / real.length, real.reduce((s, c) => s + c.lng, 0) / real.length];
@@ -1068,7 +1079,7 @@
       <div class="crumbs"><button data-act="goto" data-hash="home">홈</button> › <span>${esc(c.sido)} ${esc(c.sigungu)}</span> › <span>${esc(c.name)}</span></div>
       <div class="dhead"><div><h1>${esc(c.name)}</h1>
         <div class="meta"><span>${ico('pin', 16)}${esc(c.addr)}</span>${c.station ? `<span>${ico('train', 16)}${esc(c.station)}</span>` : ''}<span>${ico('clock', 16)}${hoursText(c)}</span><span><b style="color:var(--gold)">★</b> ${r.n ? r.avg.toFixed(1) : '-'} (${r.n})</span></div></div>
-        <div class="chips">${c.fac.map((f) => `<span class="chip">${ico(FACICO[f], 15)}${FAC[f]}</span>`).join('')}</div></div>
+        <div class="chips">${c.fac.map((f) => `<span class="chip">${ico(FACICO[f], 15)}${FAC[f]}${c.real ? `<small class="exs">${facNote(c, f)}</small>` : ''}</span>`).join('')}</div></div>
       <div class="gallery gallery-one"><figure>${photo(c, 0)}</figure></div>
       <p class="photonote">${c.real && c.url ? `사진은 <a href="${esc(c.url)}" target="_blank" rel="noopener">카카오맵에서 보기 ↗</a>` : '사진은 준비 중이에요.'}</p>
       ${c.real ? `<p class="note" style="margin:12px 0 0">이 카페의 <b>이름·주소·전화번호·위치</b>는 카카오맵 정보이고, <b>요금·좌석 수는 예시</b>예요. 실제 정보는 ${c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">카카오맵에서 확인</a>` : '카카오맵에서 확인'}해 주세요.</p>` : ''}
@@ -1076,7 +1087,7 @@
         <nav class="subnav" aria-label="상세 메뉴">${[['sec-price', '가격'], ['sec-seats', '좌석 현황'], ['sec-fac', '시설'], ['sec-loc', '위치·운영'], ['sec-rev', `후기 ${r.n}`]].map(([i, t]) => `<button data-act="nav" data-to="${i}">${t}</button>`).join('')}</nav>
         <section class="dsec" id="sec-price"><h2>${ico('chart', 20)}가격 정보${c.real ? ' <small class="muted" style="font-size:13px;font-weight:400">(예시 요금)</small>' : ''}</h2>${priceTable(c)}</section>
         <section class="dsec" id="sec-seats"><h2>${ico('user', 20)}실시간 좌석 현황</h2><div id="seatbox"></div></section>
-        <section class="dsec" id="sec-fac"><h2>${ico('sofa', 20)}시설 안내</h2>${c.real ? '<p class="muted" style="margin:0">시설 정보는 카카오맵이 제공하지 않아 표시하지 않아요. 카카오맵 링크에서 확인해 주세요.</p>' : ''}<div class="facgrid"${c.real ? ' hidden' : ''}>${Object.entries(FAC).map(([k, t]) => `<div class="facitem${c.fac.includes(k) ? '' : ' off'}"><span class="ci">${ico(FACICO[k], 20)}</span>${t}${c.fac.includes(k) ? '' : ' (없음)'}</div>`).join('')}</div></section>
+        <section class="dsec" id="sec-fac"><h2>${ico('sofa', 20)}시설 안내</h2>${c.real ? '<p class="muted" style="margin:0 0 12px">시설 정보는 카카오맵이 제공하지 않아 <b>예시</b>로 표시해요(실제와 다를 수 있어요). 24시간은 카페 이름에 표기된 경우에만 보여요. 실제 시설은 카카오맵 링크에서 확인해 주세요.</p>' : ''}<div class="facgrid">${Object.entries(FAC).map(([k, t]) => `<div class="facitem${c.fac.includes(k) ? '' : ' off'}"><span class="ci">${ico(FACICO[k], 20)}</span>${t}${c.fac.includes(k) ? (c.real ? ` (${facNote(c, k)})` : '') : (c.real ? ' (확인 안 됨)' : ' (없음)')}</div>`).join('')}</div></section>
         <section class="dsec" id="sec-loc"><h2>${ico('pin', 20)}위치·운영 정보</h2><div class="locgrid">
           <ul class="infolist">
             <li>${ico('pin', 18)}<span>${esc(c.addr)}</span></li>
