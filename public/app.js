@@ -355,7 +355,7 @@
     }
     return `<label class="sb-lbl" for="qPlan">이용 기간</label><select id="qPlan" data-q="plan">${Object.entries(PLAN).map(([k, t]) => `<option value="${k}"${q.plan === k ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
   }
-  function panelHtml() {
+  function panelFull() {
     const q = S.q, v = qView();
     const sidos = [...new Set(D.regions.map((r) => r.sido))];
     const sigs = D.regions.filter((r) => r.sido === q.sido);
@@ -407,36 +407,139 @@
       </div>
     </div>`;
   }
-  const refreshPanel = () => { const p = $('#panel'); if (p) p.innerHTML = panelHtml(); };
 
   function heroStats() {
     const real = D.cafes.some((c) => c.real);
     return `<div><b>${D.cafes.length}곳</b>등록된 스터디카페</div><div><b>${D.regions.length}개</b>비교 가능한 지역</div>`
       + (real ? '<div><b>카카오맵</b>실제 매장 정보 연동</div>' : '<div><b>샘플</b>예시 데이터로 동작 중</div>');
   }
-  function showHome() {
-    const realCount = D.cafes.filter((c) => c.real).length;
-    const reviewBlock = recentReviews();
-    view.innerHTML = `
-    <section class="hero"><div class="wrap"><h1>우리 동네 스터디카페, <em>평균보다 얼마나 저렴할까?</em></h1></div></section>
-    <div class="wrap"><div class="panel" id="panel">${panelHtml()}</div></div>
+  // =====================================================================================
+  // 화면 분리: 홈(온보딩) / 이용 옵션 / 지역 설정 / 비교·추천 / 이용 안내
+  // 검색 조건(S.q)은 모든 화면이 함께 쓰므로 한 화면에서 바꾼 조건이 다른 화면에도 그대로 반영된다.
+  // =====================================================================================
+  let curPage = 'home';
+  function summaryHtml() {
+    const q = S.q, v = qView();
+    const where = q.geo ? '내 주변' : `${q.sido} ${q.sigungu}`;
+    const when = v.mode === 'HOURLY' ? `${fmtDate(q.date)} ${hh(q.start)}–${hh(q.end)}` : `${fmtDate(q.date)} 시작 · ${PLAN[q.plan]}`;
+    const seat = q.people > 1 ? `스터디룸 ${q.people}명` : q.seat === 'ANY' ? '좌석 전체' : SEAT[q.seat];
+    const chip = (hash, icon, text) => `<button class="sumchip" data-act="goto" data-hash="${hash}">${ico(icon, 15)}${esc(text)}</button>`;
+    return `<div class="sum">
+      <div class="sum-chips">${chip('area', 'pin', where)}${chip('options', 'clock', when)}${chip('options', 'user', seat)}${q.fac.length ? chip('options', 'check', q.fac.map((k) => FAC[k]).join('·')) : ''}${q.radius ? chip('area', 'target', `반경 ${q.radius}km`) : ''}</div>
+      <div class="sum-act"><button class="btn sm" data-act="goto" data-hash="options">조건 바꾸기</button><button class="btn sm" data-act="reset">초기화</button></div>
+    </div>`;
+  }
+  function panelHtml() {
+    if (curPage === 'compare') return summaryHtml();
+    if (curPage !== 'options' && curPage !== 'area') return panelFull();
+    // 기존 검색 패널의 조각(같은 id·같은 이벤트)을 그대로 가져와 화면별로 나눠 담는다
+    const t = document.createElement('div'); t.innerHTML = panelFull();
+    const q = (s) => t.querySelector(s), g = t.querySelectorAll('.pgroup');
+    if (curPage === 'options') {
+      const note = q('.sb-note') ? q('.sb-note').outerHTML : '';
+      return `<div class="sbar sbar-3">${q('.sb-mode').outerHTML}${q('#qDate').closest('.sb-cell').outerHTML}${q('#optTime').outerHTML}</div>${note}<div class="pg-one">${g[0].outerHTML}</div>`;
+    }
+    return `<div class="sbar sbar-1">${q('#sec-area').outerHTML}</div><div class="pg-one">${g[1].outerHTML}</div>`;
+  }
+  const refreshPanel = () => { const p = $('#panel'); if (p) p.innerHTML = panelHtml(); };
 
-    <section class="section section-tight"><div class="wrap"><div class="cats" id="cats">${catsHtml()}</div></div></section>
+  const pageHead = (step, title, desc) => `<section class="pghead"><div class="wrap"><span class="pg-kicker">${step}</span><h1>${title}</h1><p>${desc}</p></div></section>`;
+  const stepNav = (prev, next) => `<div class="wrap"><div class="pg-cta">${prev ? `<button class="btn lg" data-act="goto" data-hash="${prev[0]}">← ${prev[1]}</button>` : '<span></span>'}${next ? `<button class="btn primary lg" data-act="goto" data-hash="${next[0]}">${next[1]} →</button>` : ''}</div></div>`;
 
-    <section class="section" id="sec-compare"><div class="wrap">
-      <div id="results"></div>
-    </div></section>
-
-    <section class="section" id="sec-flow"><div class="wrap">
-      <div class="sec-head"><div><h2>이렇게 이용하세요</h2><p>스터디모아의 4단계 이용 흐름</p></div></div>
-      ${flowHtml()}
-    </div></section>
-
-    ${reviewBlock ? `<section class="section"><div class="wrap">
-      <div class="sec-head"><div><h2>최근 이용 후기</h2><p>${realCount ? '이 사이트에서 남긴 후기' : '샘플 후기'}</p></div></div>
-      <div class="revgrid">${reviewBlock}</div>
-    </div></section>` : ''}`;
+  function showOptions() {
+    curPage = 'options';
+    view.innerHTML = pageHead('STEP 1', '이용 옵션', '언제, 어떤 자리를 쓸지 골라 보세요. 고른 조건은 비교 결과에 바로 반영돼요.')
+      + `<div class="wrap"><div class="panel panel-page" id="panel">${panelHtml()}</div></div>` + stepNav(null, ['area', '지역 설정']);
+  }
+  function showArea() {
+    curPage = 'area';
+    view.innerHTML = pageHead('STEP 2', '지역 설정', '찾고 싶은 동네를 고르거나 내 위치로 가까운 곳을 찾아보세요.')
+      + `<div class="wrap"><div class="panel panel-page" id="panel">${panelHtml()}</div></div>` + stepNav(['options', '이용 옵션'], ['compare', '이 조건으로 비교하기']);
+  }
+  function showCompare() {
+    curPage = 'compare';
+    view.innerHTML = pageHead('STEP 3', '비교·추천', '지역 평균 요금과 비교해 가장 알맞은 스터디카페를 찾아보세요.')
+      + `<div class="wrap"><div class="panel sumpanel" id="panel">${panelHtml()}</div></div>
+      <section class="section section-tight"><div class="wrap"><div class="cats" id="cats">${catsHtml()}</div></div></section>
+      <section class="section" id="sec-compare"><div class="wrap"><div id="results"></div></div></section>`;
     renderResults();
+  }
+  function showGuide() {
+    curPage = 'guide';
+    const reviewBlock = recentReviews(), realCount = D.cafes.filter((c) => c.real).length;
+    view.innerHTML = pageHead('이용 안내', '이렇게 이용하세요', '스터디모아의 4단계 이용 흐름을 한눈에 확인해 보세요.')
+      + `<section class="section section-tight"><div class="wrap">${flowHtml()}</div></section>`
+      + (reviewBlock ? `<section class="section"><div class="wrap"><div class="sec-head"><div><h2>최근 이용 후기</h2><p>${realCount ? '이 사이트에서 남긴 후기' : '샘플 후기'}</p></div></div><div class="revgrid">${reviewBlock}</div></div></section>` : '')
+      + `<section class="section"><div class="wrap"><div class="hm-final"><h2>준비됐다면 바로 시작해 보세요</h2><p>우리 동네 스터디카페를 평균 요금과 비교해 볼 수 있어요.</p><div class="hm-cta"><button class="btn lg hm-white" data-act="goto" data-hash="options">지금 시작하기</button></div></div></div></section>`;
+  }
+
+  // ---- 온보딩 홈 ------------------------------------------------------------------------
+  function showHome() {
+    curPage = 'home';
+    const occ = [2, 8, 13, 14, 21, 26, 30, 35];
+    const seats = Array.from({ length: 40 }, (_, i) => `<i class="${occ.includes(i) ? 't' : ''}"></i>`).join('');
+    const feat = [
+      ['calendar', '이용 옵션', '시간제·기간제, 좌석 유형, 시설까지 원하는 조건을 정해요.', 'options', 'f1'],
+      ['pin', '지역 설정', '동네를 고르거나 내 위치로 가까운 스터디카페를 찾아요.', 'area', 'f2'],
+      ['chart', '비교·추천', '지역 평균 요금과 비교해 저렴한 곳부터 보여 드려요.', 'compare', 'f3'],
+      ['list', '고객 예약', '남은 좌석을 번호까지 골라 예약하고 변경·취소도 해요.', 'reservations', 'f4'],
+    ];
+    const steps = [['조건 고르기', '언제 어떤 자리를 쓸지 정해요'], ['지역 정하기', '동네나 내 위치를 골라요'], ['비교하기', '평균 대비 요금을 확인해요'], ['예약하기', '좌석 번호를 골라 결제해요']];
+    const reviewBlock = recentReviews(), realCount = D.cafes.filter((c) => c.real).length;
+    view.innerHTML = `
+    <section class="hm-hero">
+      <div class="hm-bg" aria-hidden="true"><i class="b b1"></i><i class="b b2"></i><i class="b b3"></i></div>
+      <div class="wrap hm-hero-in">
+        <div class="hm-copy">
+          <span class="hm-badge">${ico('check', 14)}지역 평균 요금과 한눈에 비교</span>
+          <h1>우리 동네 스터디카페,<br><em>평균보다 얼마나 저렴할까?</em></h1>
+          <p>요금과 남은 좌석을 비교하고, 마음에 드는 자리를 번호까지 골라 바로 예약하세요.</p>
+          <div class="hm-cta"><button class="btn primary lg hm-big" data-act="goto" data-hash="options">지금 시작하기</button><button class="btn lg hm-big hm-ghost" data-act="goto" data-hash="guide">이용 방법 보기</button></div>
+          <div class="hm-stats"><div><b>${D.regions.length}개</b>비교 가능한 지역</div><div><b>7종</b>시설 조건 필터</div><div><b>실시간</b>좌석 현황 확인</div></div>
+        </div>
+        <div class="hm-visual" aria-hidden="true">
+          <div class="mk mk-price"><div class="mk-top"><b>스터디카페 예시</b><span class="mk-tag">평균보다 저렴</span></div><div class="mk-price-n">1,700<small>원 / 시간</small></div><div class="mk-bars"><i style="width:58%"></i><i class="avg" style="width:86%"></i></div><div class="mk-cap"><span>이 카페</span><span>지역 평균</span></div></div>
+          <div class="mk mk-seat"><div class="mk-top"><b>실시간 좌석</b><span class="mk-n">잔여 32/40석</span></div><div class="mk-grid">${seats}</div></div>
+          <div class="mk mk-ok"><span class="mk-check">${ico('check', 18)}</span><div><b>예약이 완료됐어요</b><small>일반석 12번 · 18:00–21:00</small></div></div>
+          <span class="mk-note">화면 예시</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="hm-cats rv"><div class="wrap"><div class="hm-cats-in">${CATS.map(([t, ic, kind, val]) => `<button class="hm-cat" data-act="homeCat" data-kind="${kind}" data-v="${val}"><span>${ico(ic, 18)}</span>${t}</button>`).join('')}</div></div></section>
+
+    <section class="section hm-sec rv"><div class="wrap">
+      <div class="hm-head"><span class="pg-kicker">한 곳에서</span><h2>스터디카페 찾기부터 예약까지</h2><p>필요한 기능을 단계별 화면으로 나눠 두었어요.</p></div>
+      <div class="hm-feat">${feat.map(([ic, t, d, h, c]) => `<button class="hm-fcard ${c}" data-act="goto" data-hash="${h}"><span class="hm-fi">${ico(ic, 24)}</span><h3>${t}</h3><p>${d}</p><span class="hm-go">바로 가기 →</span></button>`).join('')}</div>
+    </div></section>
+
+    <section class="section hm-sec rv"><div class="wrap">
+      <div class="hm-head"><span class="pg-kicker">이용 방법</span><h2>네 단계면 끝나요</h2></div>
+      <ol class="hm-steps">${steps.map(([t, d], i) => `<li><span class="hm-sn">${i + 1}</span><b>${t}</b><small>${d}</small></li>`).join('')}</ol>
+    </div></section>
+
+    <section class="section rv"><div class="wrap"><div class="hm-band">
+      <div><b>${D.regions.length}</b><span>비교 가능한 지역</span></div>
+      <div><b>7종</b><span>시설 조건 필터</span></div>
+      <div><b>4가지</b><span>결제 수단</span></div>
+      <div><b>100%</b><span>1시간 전까지 환불</span></div>
+    </div></div></section>
+
+    ${reviewBlock ? `<section class="section hm-sec rv"><div class="wrap"><div class="hm-head"><span class="pg-kicker">이용 후기</span><h2>최근 남겨진 후기</h2><p>${realCount ? '이 사이트에서 남긴 후기' : '샘플 후기'}</p></div><div class="revgrid">${reviewBlock}</div></div></section>` : ''}
+
+    <section class="section rv"><div class="wrap"><div class="hm-final"><h2>지금 우리 동네를 비교해 보세요</h2><p>조건을 고르는 데 1분이면 충분해요.</p><div class="hm-cta"><button class="btn lg hm-white" data-act="goto" data-hash="options">지금 시작하기</button></div></div></div></section>`;
+    // 스크롤하면 부드럽게 나타난다 (움직임을 줄이는 설정이면 생략)
+    if ('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      view.classList.add('rv-on');
+      const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
+      view.querySelectorAll('.rv').forEach((el) => io.observe(el));
+    }
+    // 배경 영상: public/media/hero.mp4 파일이 있으면 자동으로 깔린다 (없으면 그라데이션만 보인다)
+    fetch('/media/hero.mp4', { method: 'HEAD' }).then((r) => {
+      if (!r.ok || !/video/.test(r.headers.get('content-type') || '')) return;
+      const bg = view.querySelector('.hm-bg');
+      if (bg) bg.insertAdjacentHTML('afterbegin', '<video class="hm-video" src="/media/hero.mp4" autoplay muted loop playsinline></video>');
+    }).catch(() => { /* 영상 없음 */ });
   }
 
   function flowHtml() {
@@ -1302,16 +1405,12 @@
   const ACT = {
     home: (t, e) => { e.preventDefault(); location.hash = 'home'; if (!$('#panel')) return; window.scrollTo(0, 0); },
     goto: (t) => { const h = t.dataset.hash; if (location.hash === '#' + h) route(); else location.hash = h; },
-    nav: (t) => {
-      const go = () => { // 부드럽게 이동한 뒤 도착한 영역을 잠깐 강조한다
-        const el = document.getElementById(t.dataset.to);
-        if (!el) return;
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        const mark = el.querySelector('h2, h3') || el;
-        mark.classList.remove('sec-flash'); void mark.offsetWidth; mark.classList.add('sec-flash');
-        setTimeout(() => mark.classList.remove('sec-flash'), 1600);
-      };
-      if (!document.getElementById(t.dataset.to)) { location.hash = 'home'; setTimeout(go, 60); } else go();
+    // 옛 메뉴 이름(sec-*)도 새 화면 주소로 연결한다
+    nav: (t) => { const h = { 'sec-opt': 'options', 'sec-area': 'area', 'sec-compare': 'compare', 'sec-flow': 'guide' }[t.dataset.to] || 'home'; if (location.hash === '#' + h) route(); else location.hash = h; },
+    homeCat: (t) => { // 홈의 인기 카테고리: 조건을 켜고 비교 화면으로 간다
+      const { kind, v } = t.dataset;
+      if (kind === 'fac') { if (!S.q.fac.includes(v)) S.q.fac.push(v); } else if (kind === 'seat') { S.q.seat = v; S.q.people = 1; } else S.q[v] = true;
+      S.limit = PAGE; location.hash = 'compare';
     },
     soon: () => toast('준비 중인 페이지예요.'),
     closeModal,
@@ -1319,7 +1418,7 @@
     // ① 이용 옵션
     adv: () => { S.adv = !S.adv; refreshPanel(); },
     facmore: () => { S.facMore = !S.facMore; refreshPanel(); },
-    goArea: () => { const el = $('#sec-area'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); const sel = $('#qSido'); if (sel) setTimeout(() => sel.focus(), 400); } },
+    goArea: () => { if (location.hash !== '#area') location.hash = 'area'; else { const sel = $('#qSido'); if (sel) sel.focus(); } },
     locRetry: () => { S.locFail = null; toast('위치를 확인하는 중이에요…'); applyLocation(); },
     locHelp: () => openModal(`<h2>내 위치 허용하기</h2><p class="muted" style="margin:0 0 14px">한 번 거부하면 사이트가 다시 물어볼 수 없어서, 브라우저에서 직접 바꿔야 해요.</p>
       <ol style="margin:0;padding-left:20px;display:grid;gap:10px;font-size:14px">
@@ -1351,7 +1450,7 @@
       document.querySelectorAll('.cat').forEach((b) => { b.setAttribute('aria-pressed', String(!!catOn(b.dataset.kind, b.dataset.v))); });
       afterQuery();
     },
-    search: () => { const el = $('#sec-compare'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+    search: () => { location.hash = 'compare'; },
     reset: () => { resetSearch(); document.querySelectorAll('.cat').forEach((b) => b.setAttribute('aria-pressed', 'false')); afterQuery(); },
     // ③ 비교·추천
     region: (t) => {
@@ -1489,10 +1588,18 @@
   // ---- 라우팅: #home / #cafe-번호 / #reservations ------------------------------------------
   function route() {
     const h = location.hash.replace('#', '');
-    view.classList.remove('enter'); void view.offsetWidth; view.classList.add('enter'); // 화면이 바뀔 때 부드럽게 나타난다
+    view.classList.remove('enter', 'rv-on'); void view.offsetWidth; view.classList.add('enter'); // 화면이 바뀔 때 부드럽게 나타난다
+    curPage = h.startsWith('cafe-') ? 'cafe' : h || 'home';
     if (h.startsWith('cafe-')) showCafe(Number(h.slice(5)));
     else if (h === 'reservations') { if (API.on && me()) loadMyRes().finally(showReservations); else showReservations(); } // 서버 모드는 최신 예약을 불러온 뒤 그린다
+    else if (h === 'options') { showOptions(); window.scrollTo(0, 0); }
+    else if (h === 'area') { showArea(); window.scrollTo(0, 0); }
+    else if (h === 'compare') { showCompare(); window.scrollTo(0, 0); }
+    else if (h === 'guide') { showGuide(); window.scrollTo(0, 0); }
     else { showHome(); window.scrollTo(0, 0); }
+    // 지금 보고 있는 메뉴를 상단에 표시한다 (카페 상세는 '비교·추천'에 속한다)
+    const on = h.startsWith('cafe-') ? 'compare' : h || 'home';
+    document.querySelectorAll('.mainnav button').forEach((b) => { if (b.dataset.hash === on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   }
   window.addEventListener('hashchange', () => { closeModal(); route(); });
   window.addEventListener('online', recoverSession);
