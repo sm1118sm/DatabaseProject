@@ -591,6 +591,7 @@
         <label class="hs-cell"><span>지역</span><select id="hsRegion">${regionOpts}</select></label>
         <label class="hs-cell"><span>날짜</span><input type="date" id="hsDate" min="${todayStr()}" value="${esc(S.q.date)}"></label>
         <label class="hs-cell"><span>시작 시간</span><select id="hsStart">${timeOptions(S.q.start, 0, 23)}</select></label>
+        <button type="button" class="hs-geo" data-act="homeGeo" title="내 위치 기준으로 바로 찾기">${ico('target', 18)}<span>내 위치</span></button>
         <button class="hs-go" data-act="homeSearch" aria-label="이 조건으로 검색">${ico('search', 22)}</button>
       </div></div>
     </section>
@@ -1541,6 +1542,7 @@
       ensureRegion(regionOf()).finally(() => onRealLoaded());
       toast(APPLIED); location.hash = 'search'; // 바로 비교하지 않고 검색 조건에서 확인하게 한다
     },
+    homeGeo: () => { const r = $('#hsRegion'); if (r) r.value = HS_GEO; ACT.homeSearch(); }, // 홈의 '내 위치' 버튼: 내 위치로 바로 찾는다
     runCompare: () => { setCond(); if (location.hash === '#compare') route(); else location.hash = 'compare'; }, // '이 조건으로 비교하기'
     // 옛 메뉴 이름(sec-*)도 새 화면 주소로 연결한다
     nav: (t) => { const h = { 'sec-opt': 'search', 'sec-area': 'area', 'sec-compare': 'compare', 'sec-flow': 'guide' }[t.dataset.to] || 'home'; if (location.hash === '#' + h) route(); else location.hash = h; },
