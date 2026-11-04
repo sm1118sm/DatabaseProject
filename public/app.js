@@ -134,7 +134,7 @@
       if (!d || d.server !== true) return;
       API.on = true; API.social = d.social || {};
       try { API.token = localStorage.getItem(TOKEN_KEY); } catch { /* 저장소 사용 불가 */ }
-      if (API.token) await restoreSession();
+      if (API.token) API.restoreP = restoreSession(); // 로그인 확인은 DB 를 거쳐 느릴 수 있어서 첫 화면을 막지 않는다
     } catch { /* 서버 없는 정적 배포 */ }
   }
   // 서버 예약 내역을 화면이 쓰는 모양(저장소 모드의 예약과 같은 필드)으로 바꾼다
@@ -1242,6 +1242,7 @@
   // =====================================================================================
   function renderUser() {
     const u = me(), box = $('#userbox');
+    if (!u && API.on && API.token && API.restoring) { box.innerHTML = '<button class="btn sm ghost" data-act="goto" data-hash="reservations">내 예약</button><span class="hello">로그인 확인 중…</span>'; return; }
     box.innerHTML = u
       ? `<button class="btn sm ghost" data-act="goto" data-hash="reservations">내 예약</button><span class="hello">${esc(u.name)}님</span><span class="pts">${u.points.toLocaleString('ko-KR')}P</span><button class="btn sm" data-act="logout">로그아웃</button>`
       : '<button class="btn sm ghost" data-act="goto" data-hash="reservations">내 예약</button><button class="btn sm" data-act="login">로그인</button><button class="btn sm primary" data-act="signup">회원가입</button>';
@@ -1392,6 +1393,10 @@
   function showReservations() {
     const u = me();
     const head = pageHead('MY', '내 예약', '예약 내역을 확인하고 변경·취소하거나 후기를 남길 수 있어요.') + '<div class="wrap" style="padding-top:24px">';
+    if (!u && API.on && API.token && API.restoring) { // 로그인 확인이 끝나기 전에는 '로그인이 필요해요'라고 잘못 안내하지 않는다 (끝나면 다시 그린다)
+      view.innerHTML = `${head}<div class="empty" style="margin-bottom:40px"><h3>로그인 상태를 확인하는 중이에요…</h3><p class="muted">잠시만 기다려 주세요.</p></div></div>`;
+      window.scrollTo(0, 0); return;
+    }
     if (!u) {
       view.innerHTML = `${head}<div class="empty" style="margin-bottom:40px"><h3>로그인이 필요해요</h3><p class="muted">로그인하면 예약 내역을 볼 수 있어요.</p><button class="btn primary" data-act="login">로그인</button></div></div>`;
       S.pending = showReservations; window.scrollTo(0, 0); return;
@@ -1723,7 +1728,6 @@
       history.replaceState(null, '', location.pathname + location.search);
       toast(decodeURIComponent(hash0.slice(13)));
     }
-    if (API.on && SV.user) await loadMyRes();
     renderUser();
     const ra = $('#regAsof'); if (ra) ra.textContent = window.SC_REGIONS_ASOF || '';
     try { Object.keys(localStorage).filter((k) => /^studymoa:r:v[1234]:|^studymoa:real:/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch { /* 저장소 사용 불가 */ } // 쓰지 않는 옛 저장본 정리
@@ -1733,12 +1737,20 @@
     applyLocation();
     watchLocationPermission();
     initKakao();
-    route();
-    if (API.on && API.token && !SV.user) {
-      toast('로그인 상태를 확인하지 못했어요. 잠시 뒤 다시 확인합니다.');
-      window.setTimeout(recoverSession, 5000);
-    }
-    if (API.on && SV.user && !SV.user.phoneVerified) openPhoneVerify(); // 소셜로 막 가입했거나 인증을 미룬 회원
+    route(); // 화면을 먼저 그린다
+    // 로그인 확인과 내 예약 불러오기는 뒤에서 하고, 끝나면 필요한 곳만 다시 그린다
+    const afterSession = async () => {
+      if (API.on && SV.user) { try { await loadMyRes(); } catch { /* 내 예약은 나중에 다시 불러온다 */ } }
+      renderUser();
+      if (curPage === 'reservations') route(); // 내 예약은 로그인 정보가 있어야 그려진다
+      else if (curPage === 'cafe' && S.book) refreshBook();
+      if (API.on && API.token && !SV.user) {
+        toast('로그인 상태를 확인하지 못했어요. 잠시 뒤 다시 확인합니다.');
+        window.setTimeout(recoverSession, 5000);
+      }
+      if (API.on && SV.user && !SV.user.phoneVerified) openPhoneVerify(); // 소셜로 막 가입했거나 인증을 미룬 회원
+    };
+    if (API.restoreP) API.restoreP.finally(afterSession); else afterSession();
   }
   init().catch((e) => { view.innerHTML = `<div class="wrap"><p class="err">화면을 불러오지 못했어요: ${esc(e.message)}</p></div>`; });
 })();

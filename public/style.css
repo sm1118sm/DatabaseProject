@@ -636,7 +636,7 @@ h1, h2, h3, .hero h1 { word-break: keep-all; }
 .hm-stats b { display: block; font-size: 26px; font-weight: 800; color: var(--ink); line-height: 1.15; letter-spacing: -.6px; }
 
 /* ---- 홈: 벤토 타일 ---- */
-.hm-bento { display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "price seat" "price seat" "ok ok"; grid-auto-rows: minmax(128px, auto); gap: 14px; }
+.hm-bento { display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "price seat" "price seat" "ok ok"; grid-auto-rows: minmax(150px, auto); gap: 14px; }
 .bt { position: relative; border-radius: 28px; padding: 22px; transition: transform .25s ease; }
 .bt:hover { transform: translateY(-4px); }
 .bt-price { grid-area: price; background: #fff; display: flex; flex-direction: column; }
@@ -814,3 +814,18 @@ table.price td { vertical-align: top; }
 /* ---- 시설은 '예시'임을 분명히 ---- */
 .cfac .exlab { font-size: 11.5px; font-weight: 800; color: var(--blue-d); background: var(--p-blue); border-radius: 99px; padding: 2px 8px; }
 .chip .exs { margin-left: 5px; font-size: 11px; font-weight: 700; color: var(--muted); }
+
+/* ---- 첫 화면이 그려지기 전의 자리표시 ---- */
+.boot { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 55vh; color: var(--muted); font-size: 15px; font-weight: 600; }
+.boot-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--blue); animation: bootPulse 1s ease-in-out infinite; }
+@keyframes bootPulse { 0%, 100% { transform: scale(.7); opacity: .5; } 50% { transform: scale(1.15); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .boot-dot { animation: none; } }
+
+/* ---- 요금 카드: 제목과 알약이 부딪히지 않게 두 줄로, 높이도 넉넉하게 ---- */
+.bt-top { flex-wrap: wrap; gap: 6px 10px; }
+.bt-top b { white-space: nowrap; }
+.bt-price .bt-top { flex-direction: column; align-items: flex-start; gap: 8px; }
+.bt-tag { white-space: nowrap; padding: 4px 10px; font-size: 12.5px; }
+.bt-price { padding: 24px 22px; }
+.bt-price-n { padding-top: 22px; }
+.bt-seat .bt-top { align-items: center; }

@@ -29,7 +29,7 @@ for (const failure of ['503', 'network']) test(`temporary ${failure} keeps sessi
     if (failure === 'network') throw new Error('network unavailable');
     return { ok: false, status: 503, json: async () => ({ error: 'temporarily unavailable' }) };
   });
-  await context.detectServer();
+  await context.detectServer(); await context.API.restoreP; // 로그인 확인은 첫 화면을 막지 않도록 뒤에서 진행되므로, 결과를 보기 전에 끝나기를 기다린다
   assert.equal(saved(), 'valid-session');
   assert.equal(context.SV.user, null);
   healthy = true;
@@ -40,7 +40,7 @@ for (const failure of ['503', 'network']) test(`temporary ${failure} keeps sessi
 
 test('confirmed authentication failure still clears the session', async () => {
   const { context, saved } = session(async () => ({ ok: false, status: 401, json: async () => ({ error: 'expired' }) }));
-  await context.detectServer();
+  await context.detectServer(); await context.API.restoreP; // 로그인 확인은 첫 화면을 막지 않도록 뒤에서 진행되므로, 결과를 보기 전에 끝나기를 기다린다
   assert.equal(saved(), null);
 });
 

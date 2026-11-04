@@ -9,6 +9,7 @@ let calls, logs;
 
 // 모듈 안의 '마지막 시도 시각'이 테스트끼리 섞이지 않도록 매번 새로 불러온다
 const load = () => { delete require.cache[MODULE]; return require(MODULE).wakeDb; };
+const loadStatus = () => require(MODULE).wakeStatus;
 const env = (on) => {
   for (const k of ['AIVEN_TOKEN', 'AIVEN_PROJECT', 'AIVEN_SERVICE']) delete process.env[k];
   if (on) Object.assign(process.env, { AIVEN_TOKEN: SECRET, AIVEN_PROJECT: 'proj-x', AIVEN_SERVICE: 'svc-y' });
@@ -75,4 +76,18 @@ test('권한이 없어(403) 켜기가 거절돼도 오류를 던지지 않는다
   env(true); stubFetch('POWEROFF', 403);
   assert.equal(await load()(), 'power-on-403');
   assert.ok(!logs.join('\n').includes(SECRET));
+});
+
+test('상태: 설정 여부와 마지막 시도 결과만 알려 주고 비밀 값은 담지 않는다', async () => {
+  env(false);
+  const wake0 = load(); const status0 = loadStatus();
+  assert.deepEqual(status0(), { configured: false, last: null, at: null });
+  env(true); stubFetch('POWEROFF');
+  await wake0();
+  const st = status0();
+  assert.equal(st.configured, true);
+  assert.equal(st.last, 'power-on-200');
+  assert.ok(st.at);
+  const text = JSON.stringify(st);
+  assert.ok(!text.includes(SECRET) && !text.includes('proj-x') && !text.includes('svc-y'));
 });

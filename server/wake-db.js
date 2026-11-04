@@ -8,6 +8,8 @@ const COOLDOWN_MS = 60 * 1000;
 const TIMEOUT_MS = 4000;
 let lastTry = 0;
 let running = null;
+let lastResult = null; // 마지막 시도 결과(예: power-on-200, state-RUNNING, state-http-403, error)
+let lastAt = null;
 
 function wakeDb() {
   const { AIVEN_TOKEN: token, AIVEN_PROJECT: project, AIVEN_SERVICE: service } = process.env;
@@ -42,8 +44,14 @@ function wakeDb() {
     } finally {
       running = null;
     }
-  })();
+  })().then((r) => { lastResult = r; lastAt = new Date().toISOString(); return r; });
   return running;
 }
 
-module.exports = { wakeDb };
+// 설정 여부와 마지막 시도 결과만 알려 준다 (토큰·프로젝트·서비스 이름은 알려 주지 않는다)
+function wakeStatus() {
+  const { AIVEN_TOKEN, AIVEN_PROJECT, AIVEN_SERVICE } = process.env;
+  return { configured: !!(AIVEN_TOKEN && AIVEN_PROJECT && AIVEN_SERVICE), last: lastResult, at: lastAt };
+}
+
+module.exports = { wakeDb, wakeStatus };
