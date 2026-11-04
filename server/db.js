@@ -1,5 +1,6 @@
 const mysql = require('mysql2/promise');
 const { connectionOptions, dbName } = require('./dbconfig');
+const { wakeDb } = require('./wake-db');
 
 // 서버리스(Vercel)에서는 요청마다 새 인스턴스가 떠서 접속이 쉽게 늘어나므로 DB_POOL 로 인스턴스당 접속 수를 줄인다.
 const raw = mysql.createPool(connectionOptions({
@@ -17,10 +18,13 @@ const CONNECT_ERRORS = new Set(['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_A
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function withRetry(fn) {
   const attempts = Number(process.env.DB_CONNECT_ATTEMPTS || 3);
+  let woke = null;
   for (let i = 1; ; i++) {
     try { return await fn(); } catch (e) {
       if (!CONNECT_ERRORS.has(e.code)) throw e;
-      if (i >= attempts) { e.dbDown = true; throw e; }
+      // 처음 연결에 실패하면 DB 가 꺼져 있는지 확인해 꺼져 있으면 켠다 (토큰 환경 변수가 있을 때만, 재시도하는 동안 함께 진행)
+      if (!woke) woke = wakeDb();
+      if (i >= attempts) { await Promise.race([woke, sleep(3000)]); e.dbDown = true; throw e; }
       await sleep(Math.min(500 * 2 ** (i - 1), 3000));
     }
   }
