@@ -273,6 +273,22 @@
     if (value.total == null) return '<span class="cseats">좌석 정보 미등록</span>';
     return `<span class="cseats${value.free === 0 ? ' none' : value.free <= 3 ? ' few' : ''}" title="선택한 시간의 사이트 예약 기준">잔여 ${value.free}/${value.total}석</span>`;
   }
+  // DB 가 꺼져 있다가 켜지는 동안 실패한 좌석 조회를 사용자가 버튼을 누르지 않아도 다시 시도한다.
+  // 화면이 보일 때만, 이미 조회 중인 것은 건너뛰고, 목록은 8초 간격 제한이 있어 서버를 몰아치지 않는다.
+  function retryFailedSeats() {
+    if (!API.on || document.hidden) return;
+    if (curPage === 'compare') {
+      const v = qView(), failed = [];
+      for (const el of document.querySelectorAll('[data-seat-cafe]')) {
+        const c = cafeById(Number(el.dataset.seatCafe)), rec = c && SV.listSeats.get(listSeatKey(c, v));
+        if (rec && rec.status === 'error') failed.push(c);
+      }
+      if (failed.length) loadListSeats(failed, v);
+    } else if (curPage === 'cafe' && S.book) {
+      const b = S.book, c = cafeById(b.cafeId);
+      if (c && avail(c, b.type, b).failed) { SV.takenError.delete(takenKey(c, b.type, b)); refreshBook(); }
+    }
+  }
   function updateListSeats(cafes, v) {
     if (listSeatViewKey(v) !== listSeatViewKey(qView())) return;
     for (const c of cafes) for (const el of document.querySelectorAll(`[data-seat-cafe="${c.id}"]`)) el.innerHTML = listSeatsHtml(c, v);
@@ -282,7 +298,7 @@
     const pending = [], now = Date.now();
     for (const c of cafes) {
       const key = listSeatKey(c, v), old = SV.listSeats.get(key);
-      if (old && (old.status === 'loading' || now - old.at < 30000)) continue;
+      if (old && (old.status === 'loading' || now - old.at < (old.status === 'error' ? 8000 : 30000))) continue;
       const record = { status: 'loading', at: now };
       SV.listSeats.set(key, record); pending.push({ c, key, record });
     }
@@ -1738,6 +1754,9 @@
     watchLocationPermission();
     initKakao();
     route(); // 화면을 먼저 그린다
+    window.setInterval(retryFailedSeats, 12000);
+    window.addEventListener('online', retryFailedSeats);
+    document.addEventListener('visibilitychange', retryFailedSeats);
     // 로그인 확인과 내 예약 불러오기는 뒤에서 하고, 끝나면 필요한 곳만 다시 그린다
     const afterSession = async () => {
       if (API.on && SV.user) { try { await loadMyRes(); } catch { /* 내 예약은 나중에 다시 불러온다 */ } }
