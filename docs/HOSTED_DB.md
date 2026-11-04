@@ -80,3 +80,22 @@ Vercel 프로젝트 Settings → Environment Variables (Production, Preview 모�
 - GitHub 예약 실행은 기본 브랜치에서 작동하며, 실행이 지연될 수 있어 정확한 5분 간격이나 무중단을 보장하지 않는다.
 - 비밀 토큰은 코드나 문서에 적지 않고 AIVEN_TOKEN Actions secret에 저장한다. DB 접속 URI는 이 작업에 필요하지 않다.
 - 수동 실행 로그에서 Check 1/10부터 Final state: RUNNING까지 확인하고, 이후 예약 실행 기록도 확인한다.
+
+## 사이트가 스스로 DB 켜기 (선택, 권장)
+
+GitHub 예약 실행은 몇 시간씩 늦어질 수 있어서, DB 가 꺼져 있으면 사이트가 직접 켠다. DB 연결이 처음 실패하는 순간
+`server/wake-db.js` 가 Aiven 에 상태를 묻고, **꺼져 있을 때(POWEROFF)만** 켜기 요청을 보낸다. 켜지는 중이거나 이미 켜져 있으면 아무것도 하지 않는다.
+
+Vercel 프로젝트 Settings → Environment Variables (Production)에 세 값을 넣고 **다시 배포(Redeploy)** 한다.
+
+| 이름 | 값 |
+|---|---|
+| `AIVEN_TOKEN` | Aiven application user `studycafe-github-watchdog` 의 토큰 (서비스 읽기·쓰기 권한만 있는 계정, 새 토큰 생성) |
+| `AIVEN_PROJECT` | `studycafe-db` |
+| `AIVEN_SERVICE` | `mysql-1901e520` |
+
+- 세 값이 하나라도 없으면 이 기능은 꺼진 채로 둔다 (기존 동작 그대로).
+- 같은 서버 인스턴스에서는 60초에 한 번만 시도한다. 토큰은 로그에 남기지 않는다.
+- 켜지는 데 5~10분이 걸리므로 그동안 사이트는 "DB가 깨어나는 중이에요" 안내를 보여 준다.
+- 확인 방법: Aiven 콘솔에서 서비스를 Power off → 사이트를 열어 본다 → 몇 분 뒤 상태가 Running 으로 돌아온다.
+
