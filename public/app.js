@@ -505,18 +505,20 @@
   function showHome() {
     curPage = 'home';
     const occ = [2, 8, 13, 14, 21, 26, 30, 35];
-    const seats = Array.from({ length: 40 }, (_, i) => `<i class="${occ.includes(i) ? 't' : ''}"></i>`).join('');
+    const seats = Array.from({ length: 30 }, (_, i) => `<i class="${occ.includes(i) ? 't' : ''}"></i>`).join('');
     const feat = [
       ['calendar', '이용 옵션', '시간제·기간제, 좌석 유형, 시설까지 원하는 조건을 정해요.', 'options', 'f1'],
-      ['pin', '지역 설정', '동네를 고르거나 내 위치로 가까운 스터디카페를 찾아요.', 'area', 'f2'],
+      ['pin', '지역 설정', '동네를 고르거나 내 위치로 가까운 곳을 찾아요.', 'area', 'f2'],
       ['chart', '비교·추천', '지역 평균 요금과 비교해 저렴한 곳부터 보여 드려요.', 'compare', 'f3'],
       ['list', '고객 예약', '남은 좌석을 번호까지 골라 예약하고 변경·취소도 해요.', 'reservations', 'f4'],
     ];
     const steps = [['조건 고르기', '언제 어떤 자리를 쓸지 정해요'], ['지역 정하기', '동네나 내 위치를 골라요'], ['비교하기', '평균 대비 요금을 확인해요'], ['예약하기', '좌석 번호를 골라 결제해요']];
+    const regionOpts = D.regions.map((r) => `<option value="${esc(r.sido)}|${esc(r.sigungu)}"${S.q.sido === r.sido && S.q.sigungu === r.sigungu ? ' selected' : ''}>${esc(r.sido === r.sigungu ? r.sido : `${r.sido} ${r.sigungu}`)}</option>`).join('');
     const reviewBlock = recentReviews(), realCount = D.cafes.filter((c) => c.real).length;
     view.innerHTML = `
     <section class="hm-hero">
-      <div class="hm-bg" aria-hidden="true"><i class="b b1"></i><i class="b b2"></i><i class="b b3"></i></div>
+      <div class="hm-heroblock">
+      <div class="hm-bg" aria-hidden="true"></div>
       <div class="wrap hm-hero-in">
         <div class="hm-copy">
           <span class="hm-badge">${ico('check', 14)}지역 평균 요금과 한눈에 비교</span>
@@ -525,25 +527,38 @@
           <div class="hm-cta"><button class="btn primary lg hm-big" data-act="goto" data-hash="options">지금 시작하기</button><button class="btn lg hm-big hm-ghost" data-act="goto" data-hash="guide">이용 방법 보기</button></div>
           <div class="hm-stats"><div><b>${D.regions.length}개</b>비교 가능한 지역</div><div><b>7종</b>시설 조건 필터</div><div><b>실시간</b>좌석 현황 확인</div></div>
         </div>
-        <div class="hm-visual" aria-hidden="true">
-          <div class="mk mk-price"><div class="mk-top"><b>스터디카페 예시</b><span class="mk-tag">평균보다 저렴</span></div><div class="mk-price-n">1,700<small>원 / 시간</small></div><div class="mk-bars"><i style="width:58%"></i><i class="avg" style="width:86%"></i></div><div class="mk-cap"><span>이 카페</span><span>지역 평균</span></div></div>
-          <div class="mk mk-seat"><div class="mk-top"><b>실시간 좌석</b><span class="mk-n">잔여 32/40석</span></div><div class="mk-grid">${seats}</div></div>
-          <div class="mk mk-ok"><span class="mk-check">${ico('check', 18)}</span><div><b>예약이 완료됐어요</b><small>일반석 12번 · 18:00–21:00</small></div></div>
-          <span class="mk-note">화면 예시</span>
+        <div aria-hidden="true">
+          <div class="hm-bento">
+            <div class="bt bt-price"><div class="bt-top"><b>스터디카페 예시</b><span class="bt-tag">평균보다 저렴</span></div><div class="bt-price-n">1,700원<small>시간당 요금</small></div><div class="bt-bars"><i style="width:58%"></i><i class="avg" style="width:86%"></i></div><div class="bt-cap"><span>이 카페</span><span>지역 평균</span></div></div>
+            <div class="bt bt-stat"><b>${D.regions.length}</b><span>비교 가능한 지역</span></div>
+            <div class="bt bt-seat"><div class="bt-top"><b>실시간 좌석</b><span class="bt-n">잔여 24/30석</span></div><div class="bt-grid">${seats}</div></div>
+            <div class="bt bt-ok"><span class="bt-check">${ico('check', 18)}</span><div><b>예약이 완료됐어요</b><small>일반석 12번 · 18:00–21:00</small></div></div>
+          </div>
+          <p class="hm-note">화면 예시</p>
         </div>
       </div>
+      </div>
+      <div class="wrap hm-sw"><div class="hm-search" role="search" aria-label="빠른 검색">
+        <label class="hs-cell"><span>지역</span><select id="hsRegion">${regionOpts}</select></label>
+        <label class="hs-cell"><span>날짜</span><input type="date" id="hsDate" min="${todayStr()}" value="${esc(S.q.date)}"></label>
+        <label class="hs-cell"><span>시작 시간</span><select id="hsStart">${timeOptions(S.q.start, 0, 23)}</select></label>
+        <button class="hs-go" data-act="homeSearch" aria-label="이 조건으로 검색">${ico('search', 22)}</button>
+      </div></div>
     </section>
 
-    <section class="hm-cats rv"><div class="wrap"><div class="hm-cats-in">${CATS.map(([t, ic, kind, val]) => `<button class="hm-cat" data-act="homeCat" data-kind="${kind}" data-v="${val}"><span>${ico(ic, 18)}</span>${t}</button>`).join('')}</div></div></section>
+    <section class="section hm-sec rv"><div class="wrap">
+      <div class="hm-head"><span class="pg-kicker">바로 찾기</span><h2>어떤 스터디카페를<br>찾고 있나요?</h2><p>눌러서 조건을 켜고 바로 비교해 보세요.</p></div>
+      <div class="hm-tiles">${CATS.map(([t, ic, kind, val]) => `<button class="hm-cat" data-act="homeCat" data-kind="${kind}" data-v="${val}"><span class="hm-ti">${ico(ic, 22)}</span><b>${t}</b></button>`).join('')}</div>
+    </div></section>
 
     <section class="section hm-sec rv"><div class="wrap">
-      <div class="hm-head"><span class="pg-kicker">한 곳에서</span><h2>스터디카페 찾기부터 예약까지</h2><p>필요한 기능을 단계별 화면으로 나눠 두었어요.</p></div>
-      <div class="hm-feat">${feat.map(([ic, t, d, h, c]) => `<button class="hm-fcard ${c}" data-act="goto" data-hash="${h}"><span class="hm-fi">${ico(ic, 24)}</span><h3>${t}</h3><p>${d}</p><span class="hm-go">바로 가기 →</span></button>`).join('')}</div>
+      <div class="hm-head"><span class="pg-kicker">한 곳에서</span><h2>스터디카페 찾기부터<br>예약까지</h2><p>필요한 기능을 단계별 화면으로 나눠 두었어요.</p></div>
+      <div class="hm-feat">${feat.map(([ic, t, d, h, c]) => `<button class="hm-fcard ${c}" data-act="goto" data-hash="${h}"><span class="hm-fi ${c}">${ico(ic, 24)}</span><span class="hm-go" aria-hidden="true">→</span><h3>${t}</h3><p>${d}</p></button>`).join('')}</div>
     </div></section>
 
     <section class="section hm-sec rv"><div class="wrap">
       <div class="hm-head"><span class="pg-kicker">이용 방법</span><h2>네 단계면 끝나요</h2></div>
-      <ol class="hm-steps">${steps.map(([t, d], i) => `<li><span class="hm-sn">${i + 1}</span><b>${t}</b><small>${d}</small></li>`).join('')}</ol>
+      <ol class="hm-steps">${steps.map(([t, d], i) => `<li><span class="hm-sn">${String(i + 1).padStart(2, '0')}</span><b>${t}</b><small>${d}</small></li>`).join('')}</ol>
     </div></section>
 
     <section class="section rv"><div class="wrap"><div class="hm-band">
@@ -562,7 +577,7 @@
       const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
       view.querySelectorAll('.rv').forEach((el) => io.observe(el));
     }
-    // 배경 영상: public/media/hero.mp4 파일이 있으면 자동으로 깔린다 (없으면 그라데이션만 보인다)
+    // 배경 영상: public/media/hero.mp4 파일이 있으면 자동으로 깔린다 (없으면 흰 배경 그대로)
     fetch('/media/hero.mp4', { method: 'HEAD' }).then((r) => {
       if (!r.ok || !/video/.test(r.headers.get('content-type') || '')) return;
       const bg = view.querySelector('.hm-bg');
@@ -1436,6 +1451,16 @@
       const h = t.dataset.hash;
       if (h === 'compare' && !condReady()) { toast(NEED_COND); if (!/^#(search|options|area)$/.test(location.hash)) location.hash = 'search'; return; }
       if (location.hash === '#' + h) route(); else location.hash = h;
+    },
+    homeSearch: () => { // 홈의 빠른 검색: 고른 지역·날짜·시간으로 바로 비교 화면
+      const [sido, sigungu] = ($('#hsRegion').value || '').split('|'), q = S.q;
+      if (sido && sigungu) { q.sido = sido; q.sigungu = sigungu; q.geo = null; }
+      q.date = $('#hsDate').value || todayStr();
+      q.start = Number($('#hsStart').value);
+      if (q.end <= q.start) q.end = Math.min(q.start + 3, 24);
+      S.limit = PAGE; rememberRegion();
+      ensureRegion(regionOf()).finally(() => onRealLoaded());
+      ACT.runCompare();
     },
     runCompare: () => { setCond(); if (location.hash === '#compare') route(); else location.hash = 'compare'; }, // '이 조건으로 비교하기'
     // 옛 메뉴 이름(sec-*)도 새 화면 주소로 연결한다
