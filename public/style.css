@@ -636,7 +636,7 @@ h1, h2, h3, .hero h1 { word-break: keep-all; }
 .hm-stats b { display: block; font-size: 26px; font-weight: 800; color: var(--ink); line-height: 1.15; letter-spacing: -.6px; }
 
 /* ---- 홈: 벤토 타일 ---- */
-.hm-bento { display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "price stat" "price seat" "ok seat"; grid-auto-rows: minmax(128px, auto); gap: 14px; }
+.hm-bento { display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "price seat" "price seat" "ok stat"; grid-auto-rows: minmax(128px, auto); gap: 14px; }
 .bt { position: relative; border-radius: 28px; padding: 22px; transition: transform .25s ease; }
 .bt:hover { transform: translateY(-4px); }
 .bt-price { grid-area: price; background: #fff; display: flex; flex-direction: column; }
@@ -656,6 +656,7 @@ h1, h2, h3, .hero h1 { word-break: keep-all; }
 .bt-grid i { aspect-ratio: 1; border-radius: 7px; background: #fff; border: 1px solid #d5dae1; }
 .bt-grid i.t { background: #e5e8ec; border-color: #e5e8ec; }
 .bt-check { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: var(--blue); color: #fff; flex: none; }
+.bt, .bt b, .bt small, .bt span { word-break: keep-all; }
 .bt-ok b { display: block; font-size: 14px; }
 .bt-ok small { color: #aab4c3; font-size: 12.5px; }
 .bt-stat b { font-size: 44px; font-weight: 800; letter-spacing: -1.6px; line-height: 1; color: #5b4a12; }
@@ -778,7 +779,7 @@ h1, h2, h3, .hero h1 { word-break: keep-all; }
   .hm-cat { min-height: 116px; padding: 16px; border-radius: 22px; }
   .hm-copy > p { font-size: 16px; }
   .hm-big { padding: 14px 22px; flex: 1; }
-  .hm-bento { grid-template-areas: "price price" "stat ok" "seat seat"; }
+  .hm-bento { grid-template-areas: "price price" "seat seat" "ok stat"; }
   .hm-feat, .hm-steps { grid-template-columns: 1fr; }
   .hm-fcard, .hm-fcard.f1, .hm-fcard.f4 { grid-column: span 1; min-height: 220px; padding: 24px; }
   .hm-band { grid-template-columns: repeat(2, 1fr); padding: 30px 14px; border-radius: 28px; }

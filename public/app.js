@@ -525,7 +525,7 @@
           <h1>우리 동네 스터디카페,<br><em>평균보다 얼마나 저렴할까?</em></h1>
           <p>요금과 남은 좌석을 비교하고, 마음에 드는 자리를 번호까지 골라 바로 예약하세요.</p>
           <div class="hm-cta"><button class="btn primary lg hm-big" data-act="goto" data-hash="options">지금 시작하기</button><button class="btn lg hm-big hm-ghost" data-act="goto" data-hash="guide">이용 방법 보기</button></div>
-          <div class="hm-stats"><div><b>${D.regions.length}개</b>비교 가능한 지역</div><div><b>7종</b>시설 조건 필터</div><div><b>실시간</b>좌석 현황 확인</div></div>
+          <div class="hm-stats"><div><b>전국</b>시·군·구 단위 비교</div><div><b>7종</b>시설 조건 필터</div><div><b>실시간</b>좌석 현황 확인</div></div>
         </div>
         <div aria-hidden="true">
           <div class="hm-bento">
