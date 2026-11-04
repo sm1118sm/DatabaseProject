@@ -418,6 +418,17 @@
   // 검색 조건(S.q)은 모든 화면이 함께 쓰므로 한 화면에서 바꾼 조건이 다른 화면에도 그대로 반영된다.
   // =====================================================================================
   let curPage = 'home';
+  // 검색 조건을 정하고 '이 조건으로 비교하기'를 누르기 전에는 비교·추천을 열 수 없다 (이 브라우저 탭에서만 유지)
+  const COND_KEY = 'studymoa:cond';
+  const condReady = () => { try { return sessionStorage.getItem(COND_KEY) === '1'; } catch { return !!S.condReady; } };
+  const setCond = () => { S.condReady = true; try { sessionStorage.setItem(COND_KEY, '1'); } catch { /* 저장소 사용 불가 */ } updateGate(); };
+  const NEED_COND = "검색 조건을 먼저 정하고 '이 조건으로 비교하기'를 눌러 주세요.";
+  function updateGate() {
+    const on = condReady();
+    document.querySelectorAll('.mainnav [data-hash="compare"]').forEach((b) => {
+      if (on) { b.removeAttribute('aria-disabled'); b.removeAttribute('title'); } else { b.setAttribute('aria-disabled', 'true'); b.title = NEED_COND; }
+    });
+  }
   function summaryHtml() {
     const q = S.q, v = qView();
     const where = q.geo ? '내 주변' : `${q.sido} ${q.sigungu}`;
@@ -436,7 +447,8 @@
     const seat = q.people > 1 ? `스터디룸 ${q.people}명` : q.seat === 'ANY' ? '좌석 전체' : SEAT[q.seat];
     const rows = [['지역', where], ['이용 형태', v.mode === 'HOURLY' ? '시간제' : '기간제'], ['일시', when], ['좌석', seat], ['시설', q.fac.length ? q.fac.map((k) => FAC[k]).join('·') : '선택 안 함'], ['거리', q.radius ? `반경 ${q.radius}km` : '제한 없음']];
     return `<h3>선택한 조건</h3><dl>${rows.map(([k, t]) => `<div><dt>${k}</dt><dd>${esc(t)}</dd></div>`).join('')}</dl>
-      <button class="btn primary lg block" data-act="goto" data-hash="compare">이 조건으로 비교하기 →</button>
+      <button class="btn primary lg block" data-act="runCompare">이 조건으로 비교하기 →</button>
+      ${condReady() ? '' : '<p class="note gatenote">이 버튼을 누르면 비교·추천 메뉴가 열려요.</p>'}
       <button class="btn block" data-act="reset" style="margin-top:8px">조건 초기화</button>`;
   }
   function panelHtml() {
@@ -1420,13 +1432,18 @@
   const onRealLoaded = () => { refreshPanel(); refreshCats(); refreshMaps(); };
   const ACT = {
     home: (t, e) => { e.preventDefault(); location.hash = 'home'; if (!$('#panel')) return; window.scrollTo(0, 0); },
-    goto: (t) => { const h = t.dataset.hash; if (location.hash === '#' + h) route(); else location.hash = h; },
+    goto: (t) => {
+      const h = t.dataset.hash;
+      if (h === 'compare' && !condReady()) { toast(NEED_COND); if (!/^#(search|options|area)$/.test(location.hash)) location.hash = 'search'; return; }
+      if (location.hash === '#' + h) route(); else location.hash = h;
+    },
+    runCompare: () => { setCond(); if (location.hash === '#compare') route(); else location.hash = 'compare'; }, // '이 조건으로 비교하기'
     // 옛 메뉴 이름(sec-*)도 새 화면 주소로 연결한다
     nav: (t) => { const h = { 'sec-opt': 'search', 'sec-area': 'area', 'sec-compare': 'compare', 'sec-flow': 'guide' }[t.dataset.to] || 'home'; if (location.hash === '#' + h) route(); else location.hash = h; },
     homeCat: (t) => { // 홈의 인기 카테고리: 조건을 켜고 비교 화면으로 간다
       const { kind, v } = t.dataset;
       if (kind === 'fac') { if (!S.q.fac.includes(v)) S.q.fac.push(v); } else if (kind === 'seat') { S.q.seat = v; S.q.people = 1; } else S.q[v] = true;
-      S.limit = PAGE; location.hash = 'compare';
+      S.limit = PAGE; ACT.runCompare();
     },
     soon: () => toast('준비 중인 페이지예요.'),
     closeModal,
@@ -1466,7 +1483,7 @@
       document.querySelectorAll('.cat').forEach((b) => { b.setAttribute('aria-pressed', String(!!catOn(b.dataset.kind, b.dataset.v))); });
       afterQuery();
     },
-    search: () => { location.hash = 'compare'; },
+    search: () => ACT.runCompare(),
     reset: () => { resetSearch(); document.querySelectorAll('.cat').forEach((b) => b.setAttribute('aria-pressed', 'false')); afterQuery(); },
     // ③ 비교·추천
     region: (t) => {
@@ -1606,6 +1623,7 @@
     const h = location.hash.replace('#', '');
     view.classList.remove('enter', 'rv-on'); void view.offsetWidth; view.classList.add('enter'); // 화면이 바뀔 때 부드럽게 나타난다
     curPage = h.startsWith('cafe-') ? 'cafe' : h || 'home';
+    if (h === 'compare' && !condReady()) { toast(NEED_COND); location.hash = 'search'; return; }
     if (h.startsWith('cafe-')) showCafe(Number(h.slice(5)));
     else if (h === 'reservations') { if (API.on && me()) loadMyRes().finally(showReservations); else showReservations(); } // 서버 모드는 최신 예약을 불러온 뒤 그린다
     else if (h === 'options' || h === 'area' || h === 'search') { showSearch(h === 'area'); if (h !== 'area') window.scrollTo(0, 0); }
@@ -1614,6 +1632,7 @@
     else { showHome(); window.scrollTo(0, 0); }
     // 지금 보고 있는 메뉴를 상단에 표시한다 (카페 상세는 '비교·추천'에 속한다)
     const on = h.startsWith('cafe-') ? 'compare' : (h === 'options' || h === 'area') ? 'search' : h || 'home';
+    updateGate();
     document.querySelectorAll('.mainnav button, .userbox [data-hash]').forEach((b) => { if (b.dataset.hash === on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   }
   window.addEventListener('hashchange', () => { closeModal(); route(); });

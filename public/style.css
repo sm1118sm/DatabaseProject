@@ -790,3 +790,8 @@ h1, h2, h3, .hero h1 { word-break: keep-all; }
 .card { border-radius: 20px; }
 .card:hover { box-shadow: 0 16px 36px rgba(60, 90, 220, .14); border-color: #c9d9ff; }
 @media (max-width: 640px) { .modal-body::before { margin: -20px -20px 16px; } .bookcard::before { margin: -20px -20px 16px; } }
+
+/* ---- 비교·추천은 검색 조건을 정한 뒤에만 열린다 ---- */
+.mainnav button[aria-disabled="true"], .footer button[aria-disabled="true"] { opacity: .42; cursor: not-allowed; }
+.mainnav button[aria-disabled="true"]:hover { background: none; }
+.gatenote { margin: 10px 0 0; text-align: center; color: var(--muted); font-size: 13px; }
