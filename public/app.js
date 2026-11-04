@@ -422,6 +422,7 @@
   const COND_KEY = 'studymoa:cond';
   const condReady = () => { try { return sessionStorage.getItem(COND_KEY) === '1'; } catch { return !!S.condReady; } };
   const setCond = () => { S.condReady = true; try { sessionStorage.setItem(COND_KEY, '1'); } catch { /* 저장소 사용 불가 */ } updateGate(); };
+  const APPLIED = "고른 조건이 적용됐어요. 확인한 뒤 '이 조건으로 비교하기'를 눌러 주세요.";
   const NEED_COND = "검색 조건을 먼저 정하고 '이 조건으로 비교하기'를 눌러 주세요.";
   function updateGate() {
     const on = condReady();
@@ -978,12 +979,18 @@
       resolve(false);
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }));
   }
+  // 홈의 빠른 검색 칸을 지금 검색 조건에 맞춘다 (위치가 홈이 그려진 뒤에 도착해도 반영되도록)
+  function syncHomeSearch() {
+    const r = $('#hsRegion'); if (r) r.value = `${S.q.sido}|${S.q.sigungu}`;
+    const d = $('#hsDate'); if (d) d.value = S.q.date;
+    const s = $('#hsStart'); if (s) s.value = String(S.q.start);
+  }
   // 현재 위치를 받아 지역 선택(시/도·구/군)과 결과를 그 위치로 바꾼다. 성공하면 true.
   function applyLocation(announce) {
     if (S.locating) return Promise.resolve(false);
     return locate().then((ok) => {
       if (!ok) { renderResults(); return false; }
-      refreshPanel(); refreshCats();
+      syncHomeSearch(); refreshPanel(); refreshCats();
       const pr = ensureRegion(regionOf()); renderResults(); pr.finally(() => onRealLoaded()); // 지금 있는 시·군·구의 카페 전체를 불러온다
       if (announce) toast(`현재 위치를 반영했어요: ${S.q.sido} ${S.q.sigungu}`);
       return true;
@@ -1452,7 +1459,7 @@
       if (q.end <= q.start) q.end = Math.min(q.start + 3, 24);
       S.limit = PAGE; rememberRegion();
       ensureRegion(regionOf()).finally(() => onRealLoaded());
-      ACT.runCompare();
+      toast(APPLIED); location.hash = 'search'; // 바로 비교하지 않고 검색 조건에서 확인하게 한다
     },
     runCompare: () => { setCond(); if (location.hash === '#compare') route(); else location.hash = 'compare'; }, // '이 조건으로 비교하기'
     // 옛 메뉴 이름(sec-*)도 새 화면 주소로 연결한다
@@ -1460,7 +1467,7 @@
     homeCat: (t) => { // 홈의 인기 카테고리: 조건을 켜고 비교 화면으로 간다
       const { kind, v } = t.dataset;
       if (kind === 'fac') { if (!S.q.fac.includes(v)) S.q.fac.push(v); } else if (kind === 'seat') { S.q.seat = v; S.q.people = 1; } else S.q[v] = true;
-      S.limit = PAGE; ACT.runCompare();
+      S.limit = PAGE; toast(APPLIED); location.hash = 'search'; // 바로 비교하지 않고 검색 조건에서 확인하게 한다
     },
     soon: () => toast('준비 중인 페이지예요.'),
     closeModal,
