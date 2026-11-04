@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const pool = require('./db');
+const { wakeStatus } = require('./wake-db');
 const retryTransaction = require('./retry-transaction');
 const hasReservationOverlap = require('./reservation-overlap');
 const listAvailability = require('./list-availability');
@@ -100,6 +101,14 @@ async function completePast(conn, memberId) {
 }
 
 // ---- 설정 / 지역 ---------------------------------------------------------
+// 상태 확인: DB 에 실제로 질의해 보고, '스스로 켜기' 설정과 마지막 시도 결과를 알려 준다 (비밀 값은 없다).
+// 외부 감시(UptimeRobot 등)에 쓰면 사이트가 아니라 DB 까지 살아 있는지 확인할 수 있다.
+app.get('/api/health', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try { await pool.query('SELECT 1'); res.json({ ok: true, db: 'up', wake: wakeStatus() }); }
+  catch (e) { res.status(503).json({ ok: false, db: 'down', wake: wakeStatus() }); }
+});
+
 app.get('/api/config', (req, res) => {
   res.json({
     server: true,
