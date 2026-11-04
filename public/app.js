@@ -431,9 +431,10 @@
         </div>
         <div class="pgroup">
           <h3>거리·주변</h3>
-          <div class="field"><span class="lbl">거리 기준</span><div class="row2">
-            <select id="qRadius" data-q="radius" aria-label="반경">${[[0, '반경 제한 없음'], [1, '반경 1km'], [3, '반경 3km'], [5, '반경 5km']].map(([k, t]) => `<option value="${k}"${q.radius === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
-            <button class="btn" data-act="geo" aria-pressed="${!!q.geo}">${ico('target', 16)}${q.geo ? '내 위치 해제' : '내 위치로 검색'}</button></div></div>
+          <div class="field"><span class="lbl">${q.geo ? '내 위치에서 반경' : '거리 기준'}</span><div class="row2">
+            <select id="qRadius" data-q="radius" aria-label="반경">${[[0, q.geo ? '가까운 지역 전체' : '반경 제한 없음'], ...RADIUS_KM.map((k) => [k, `반경 ${k}km`])].map(([k, t]) => `<option value="${k}"${q.radius === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
+            <button class="btn" data-act="geo" aria-pressed="${!!q.geo}">${ico('target', 16)}${q.geo ? '내 위치 해제' : '내 위치로 검색'}</button></div>
+            ${q.geo && !q.radius ? '<p class="note" style="margin-top:8px">반경을 정하면 더 가까운 곳만 볼 수 있어요.</p>' : ''}</div>
           <div class="field" style="margin-bottom:0"><span class="lbl">추가 지역 조건</span><div class="chips">
             <button class="chip" data-act="near" data-k="nearStation" aria-pressed="${q.nearStation}">${ico('train', 15)}역 근처</button>
             <button class="chip" data-act="near" data-k="nearUniv" aria-pressed="${q.nearUniv}">${ico('school', 15)}대학교 근처</button></div></div>
@@ -482,21 +483,21 @@
   }
   function summaryHtml() {
     const q = S.q, v = qView();
-    const where = q.geo ? '내 주변' : `${q.sido} ${q.sigungu}`;
+    const where = q.geo ? (q.radius ? `내 주변 ${q.radius}km 이내` : '내 주변') : `${q.sido} ${q.sigungu}`;
     const when = v.mode === 'HOURLY' ? `${fmtDate(q.date)} ${hh(q.start)}–${hh(q.end)}` : `${fmtDate(q.date)} 시작 · ${PLAN[q.plan]}`;
     const seat = q.people > 1 ? `스터디룸 ${q.people}명` : q.seat === 'ANY' ? '좌석 전체' : SEAT[q.seat];
     const chip = (hash, icon, text) => `<button class="sumchip" data-act="goto" data-hash="${hash}">${ico(icon, 15)}${esc(text)}</button>`;
     return `<div class="sum">
-      <div class="sum-chips">${chip('area', 'pin', where)}${chip('options', 'clock', when)}${chip('options', 'user', seat)}${q.fac.length ? chip('options', 'check', q.fac.map((k) => FAC[k]).join('·') + (realMode() && q.fac.some((k) => k !== 'h') ? ' (예시)' : '')) : ''}${q.radius ? chip('area', 'target', `반경 ${q.radius}km`) : ''}</div>
+      <div class="sum-chips">${chip('area', 'pin', where)}${chip('options', 'clock', when)}${chip('options', 'user', seat)}${q.fac.length ? chip('options', 'check', q.fac.map((k) => FAC[k]).join('·') + (realMode() && q.fac.some((k) => k !== 'h') ? ' (예시)' : '')) : ''}${q.radius && !q.geo ? chip('area', 'target', `반경 ${q.radius}km`) : ''}</div>
       <div class="sum-act"><button class="btn sm" data-act="goto" data-hash="options">조건 바꾸기</button><button class="btn sm" data-act="reset">초기화</button></div>
     </div>`;
   }
   function sideSummaryHtml() {
     const q = S.q, v = qView();
-    const where = q.geo ? '내 주변' : `${q.sido} ${q.sigungu}`;
+    const where = q.geo ? (q.radius ? `내 주변 ${q.radius}km 이내` : '내 주변') : `${q.sido} ${q.sigungu}`;
     const when = v.mode === 'HOURLY' ? `${fmtDate(q.date)} ${hh(q.start)}–${hh(q.end)}` : `${fmtDate(q.date)} 시작 · ${PLAN[q.plan]}`;
     const seat = q.people > 1 ? `스터디룸 ${q.people}명` : q.seat === 'ANY' ? '좌석 전체' : SEAT[q.seat];
-    const rows = [['지역', where], ['이용 형태', v.mode === 'HOURLY' ? '시간제' : '기간제'], ['일시', when], ['좌석', seat], ['시설', q.fac.length ? q.fac.map((k) => FAC[k]).join('·') : '선택 안 함'], ['거리', q.radius ? `반경 ${q.radius}km` : '제한 없음'], ['정렬', { price: '최저가순', distance: '거리순', rating: '평점순', diff: '평균 대비 저렴순' }[q.sort] || '최저가순']];
+    const rows = [['지역', where], ['이용 형태', v.mode === 'HOURLY' ? '시간제' : '기간제'], ['일시', when], ['좌석', seat], ['시설', q.fac.length ? q.fac.map((k) => FAC[k]).join('·') : '선택 안 함'], ['거리', q.geo ? (q.radius ? `내 위치에서 반경 ${q.radius}km` : '내 위치 · 가까운 지역 전체') : q.radius ? `반경 ${q.radius}km` : '제한 없음'], ['정렬', { price: '최저가순', distance: '거리순', rating: '평점순', diff: '평균 대비 저렴순' }[q.sort] || '최저가순']];
     return `<h3>선택한 조건</h3><dl>${rows.map(([k, t]) => `<div><dt>${k}</dt><dd>${esc(t)}</dd></div>`).join('')}</dl>
       <button class="btn primary lg block" data-act="runCompare">이 조건으로 비교하기 →</button>
       ${condReady() ? '' : '<p class="note gatenote">지역을 고르면 비교·추천 메뉴가 열려요.</p>'}
@@ -644,6 +645,7 @@
   }
 
   // ---- 검색 결과 ---------------------------------------------------------------------
+  const RADIUS_KM = [1, 3, 5, 10, 20, 30]; // 거리 기준 선택지
   const NEAR_DEFAULT_KM = 5; // 내 주변에서 카페를 불러올 때 기준으로 삼는 거리
   function results(ignoreRadius = false) {
     const q = S.q, v = qView(), org = origin();
@@ -727,7 +729,7 @@
     // 반경을 걸었는데 비면 반경 밖 카페를 섞어 보여주지 않고, 가장 가까운 곳까지의 거리를 알려준다
     const outside = q.radius && !list.length ? results(true) : [];
     const nearD = outside.length ? Math.min(...outside.map((x) => x.d)) : null;
-    const where = q.geo ? '내 주변' : `${q.sido} ${q.sigungu}`;
+    const where = q.geo ? (q.radius ? `내 주변 ${q.radius}km 이내` : '내 주변') : `${q.sido} ${q.sigungu}`;
     const when = v.mode === 'HOURLY' ? `${fmtDate(v.date)} ${hh(v.start)}–${hh(v.end)}` : `${PLAN[v.plan]}`;
     const sorts = [['price', '최저가순'], ['distance', '거리순'], ['rating', '평점순'], ['diff', '평균 대비 저렴순']];
     const loading = !!S.regionLoading, noKakao = !S.kakao && !D.cafes.some((c) => c.sido === q.sido && c.sigungu === q.sigungu);
@@ -1075,12 +1077,12 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden && !S.me && S.locFail === 'denied' && navigator.permissions) navigator.permissions.query({ name: 'geolocation' }).then((st) => { if (st.state === 'granted') retry(); }).catch(() => {}); });
   }
   // 내 위치 모드: 내 위치 주변(반경 안)에 걸친 시·군·구를 모두 불러온다 (너무 많으면 가까운 3곳)
-  // 내 위치와 가까운 지역(최대 3곳)
+  // 내 위치와 가까운 지역(반경에 따라 3~8곳)
   function nearRegions(pt, km) {
     return D.regions.map((r) => {
       const [x0, y0, x1, y1] = r.box, pad = km / 88;
       return { r, d: dist(pt, r.center), hit: pt[1] >= x0 - pad && pt[1] <= x1 + pad && pt[0] >= y0 - km / 111 && pt[0] <= y1 + km / 111 };
-    }).filter((x) => x.hit).sort((a, b) => a.d - b.d).slice(0, 3).map((x) => x.r);
+    }).filter((x) => x.hit).sort((a, b) => a.d - b.d).slice(0, km >= 20 ? 8 : km >= 10 ? 5 : 3).map((x) => x.r); // 반경이 클수록 더 많은 지역을 불러온다
   }
   function ensureNear(pt, km) { return Promise.all(nearRegions(pt, km).map((r) => ensureRegion(r))); }
 
