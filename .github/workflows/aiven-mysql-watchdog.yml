@@ -42,10 +42,28 @@ jobs:
             echo "Check $check_number/10 - current state: $state"
 
             if [ "$state" = "POWEROFF" ]; then
-              avn --auth-token "$AIVEN_TOKEN" service update "$AIVEN_SERVICE" \
-                --project "$AIVEN_PROJECT" --power-on
-              avn --auth-token "$AIVEN_TOKEN" service wait "$AIVEN_SERVICE" \
-                --project "$AIVEN_PROJECT"
+              # The CLI's `service update` first reads the service-type list, which needs a permission
+              # this application user lacks (403 ProjectServiceTypesGet). Power on through the REST API,
+              # which only needs project:services:write, and fall back to the CLI if that fails.
+              api="https://api.aiven.io/v1/project/$AIVEN_PROJECT/service/$AIVEN_SERVICE"
+              if ! curl -fsS --max-time 30 -X PUT "$api" \
+                  -H "Authorization: aivenv1 $AIVEN_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d '{"powered": true}' > /dev/null; then
+                echo "REST power-on failed; trying the CLI"
+                avn --auth-token "$AIVEN_TOKEN" service update "$AIVEN_SERVICE" \
+                  --project "$AIVEN_PROJECT" --power-on
+              fi
+              # Wait up to ~10 minutes for RUNNING by polling the state we already know how to read.
+              for wait_number in {1..40}; do
+                sleep 15
+                state="$({
+                  avn --auth-token "$AIVEN_TOKEN" service get "$AIVEN_SERVICE" \
+                    --project "$AIVEN_PROJECT" --json
+                } | python -c 'import json,sys; print(json.load(sys.stdin)["state"])')"
+                echo "Power-on wait $wait_number/40 - state: $state"
+                [ "$state" = "RUNNING" ] && break
+              done
             fi
 
             if [ "$check_number" -lt 10 ]; then
