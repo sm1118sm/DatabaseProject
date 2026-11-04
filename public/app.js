@@ -564,7 +564,7 @@
       ['chart', '비교·추천', '지역 평균 요금과 비교해 저렴한 곳부터 보여 드려요.', 'compare', 'f3'],
       ['list', '고객 예약', '남은 좌석을 번호까지 골라 예약하고 변경·취소도 해요.', 'reservations', 'f4'],
     ];
-    const regionOpts = D.regions.map((r) => `<option value="${esc(r.sido)}|${esc(r.sigungu)}"${S.q.sido === r.sido && S.q.sigungu === r.sigungu ? ' selected' : ''}>${esc(r.sido === r.sigungu ? r.sido : `${r.sido} ${r.sigungu}`)}</option>`).join('');
+    const regionOpts = `<option value="${HS_GEO}"${S.q.geo ? ' selected' : ''}>◎ 내 위치 (내 주변)</option>` + D.regions.map((r) => `<option value="${esc(r.sido)}|${esc(r.sigungu)}"${!S.q.geo && S.q.sido === r.sido && S.q.sigungu === r.sigungu ? ' selected' : ''}>${esc(r.sido === r.sigungu ? r.sido : `${r.sido} ${r.sigungu}`)}</option>`).join('');
     const reviewBlock = recentReviews(), realCount = D.cafes.filter((c) => c.real).length;
     view.innerHTML = `
     <section class="hm-hero">
@@ -1051,8 +1051,9 @@
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }));
   }
   // 홈의 빠른 검색 칸을 지금 검색 조건에 맞춘다 (위치가 홈이 그려진 뒤에 도착해도 반영되도록)
+  const HS_GEO = '__geo__'; // 홈 빠른 검색의 '내 위치' 선택지
   function syncHomeSearch() {
-    const r = $('#hsRegion'); if (r) r.value = `${S.q.sido}|${S.q.sigungu}`;
+    const r = $('#hsRegion'); if (r) r.value = S.q.geo ? HS_GEO : `${S.q.sido}|${S.q.sigungu}`;
     const d = $('#hsDate'); if (d) d.value = S.q.date;
     const s = $('#hsStart'); if (s) s.value = String(S.q.start);
   }
@@ -1529,11 +1530,13 @@
       if (location.hash === '#' + h) route(); else location.hash = h;
     },
     homeSearch: () => { // 홈의 빠른 검색: 고른 지역·날짜·시간으로 바로 비교 화면
-      const [sido, sigungu] = ($('#hsRegion').value || '').split('|'), q = S.q;
-      if (sido && sigungu) { q.sido = sido; q.sigungu = sigungu; q.geo = null; setCond(); }
+      const regionVal = $('#hsRegion').value || '', [sido, sigungu] = regionVal.split('|'), q = S.q;
+      const wantGeo = regionVal === HS_GEO;
+      if (!wantGeo && sido && sigungu) { q.sido = sido; q.sigungu = sigungu; q.geo = null; setCond(); }
       q.date = $('#hsDate').value || todayStr();
       q.start = Number($('#hsStart').value);
       if (q.end <= q.start) q.end = Math.min(q.start + 3, 24);
+      if (wantGeo) { ACT.homeCat({ dataset: { kind: 'geo', v: 'geo' } }); return; } // 내 위치로 찾기: 위치를 확인한 뒤 내 주변으로 적용한다
       S.limit = PAGE; rememberRegion();
       ensureRegion(regionOf()).finally(() => onRealLoaded());
       toast(APPLIED); location.hash = 'search'; // 바로 비교하지 않고 검색 조건에서 확인하게 한다
