@@ -793,3 +793,20 @@ h1, h2, h3, .hero h1 { word-break: keep-all; }
   .bt:hover, .hm-fcard:hover, .hm-cat:hover, .flow .flowcard:hover { transform: none; }
   .rv-on .rv { opacity: 1; transform: none; transition: none; }
 }
+
+/* ---- 평균 대비를 한눈에: 알약 + 비교 막대 ---- */
+.cdiff { margin-top: 12px; }
+.dbadge { display: inline-flex; align-items: center; gap: 4px; padding: 6px 11px; border-radius: 99px; font-size: 13.5px; font-weight: 800; line-height: 1.2; }
+.dbadge.low { background: var(--cheap-soft); color: var(--cheap); }
+.dbadge.high { background: var(--pricey-soft); color: var(--pricey); }
+.dbadge.even { background: var(--p-gray); color: #4e5968; }
+.dbadge.sm { display: flex; width: max-content; margin-top: 6px; padding: 3px 9px; font-size: 12px; }
+.dbar { position: relative; height: 8px; margin: 12px 0 5px; border-radius: 8px; background: #edf0f4; }
+.dbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 8px; background: var(--blue); }
+.dbar i.low { background: var(--cheap); } .dbar i.high { background: var(--pricey); }
+.dbar b { position: absolute; top: -4px; width: 2px; height: 16px; border-radius: 2px; background: var(--ink); transform: translateX(-1px); }
+.dcap { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+table.price td .pv { display: block; }
+.bt-tag { color: var(--cheap); }
+table.price td:first-child, table.price th:first-child { white-space: nowrap; min-width: 92px; }
+table.price td { vertical-align: top; }
