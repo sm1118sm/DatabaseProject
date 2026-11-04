@@ -530,7 +530,6 @@
         <div aria-hidden="true">
           <div class="hm-bento">
             <div class="bt bt-price"><div class="bt-top"><b>스터디카페 예시</b><span class="bt-tag">평균보다 저렴</span></div><div class="bt-price-n">1,700원<small>시간당 요금</small></div><div class="bt-bars"><i style="width:58%"></i><i class="avg" style="width:86%"></i></div><div class="bt-cap"><span>이 카페</span><span>지역 평균</span></div></div>
-            <div class="bt bt-stat"><b>${D.regions.length}</b><span>비교 가능한 지역</span></div>
             <div class="bt bt-seat"><div class="bt-top"><b>실시간 좌석</b><span class="bt-n">잔여 24/30석</span></div><div class="bt-grid">${seats}</div></div>
             <div class="bt bt-ok"><span class="bt-check">${ico('check', 18)}</span><div><b>예약이 완료됐어요</b><small>일반석 12번 · 18:00–21:00</small></div></div>
           </div>
