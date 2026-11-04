@@ -432,9 +432,8 @@
         <div class="pgroup">
           <h3>거리·주변</h3>
           <div class="field"><span class="lbl">${q.geo ? '내 위치에서 반경' : '거리 기준'}</span><div class="row2">
-            <select id="qRadius" data-q="radius" aria-label="반경">${[[0, q.geo ? '가까운 지역 전체' : '반경 제한 없음'], ...RADIUS_KM.map((k) => [k, `반경 ${k}km`])].map(([k, t]) => `<option value="${k}"${q.radius === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
-            <button class="btn" data-act="geo" aria-pressed="${!!q.geo}">${ico('target', 16)}${q.geo ? '내 위치 해제' : '내 위치로 검색'}</button></div>
-            ${q.geo && !q.radius ? '<p class="note" style="margin-top:8px">반경을 정하면 더 가까운 곳만 볼 수 있어요.</p>' : ''}</div>
+            <select id="qRadius" data-q="radius" aria-label="반경">${[...(q.geo ? [] : [[0, '반경 제한 없음']]), ...RADIUS_KM.map((k) => [k, `반경 ${k}km`])].map(([k, t]) => `<option value="${k}"${q.radius === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
+            <button class="btn" data-act="geo" aria-pressed="${!!q.geo}">${ico('target', 16)}${q.geo ? '내 위치 해제' : '내 위치로 검색'}</button></div></div>
           <div class="field" style="margin-bottom:0"><span class="lbl">추가 지역 조건</span><div class="chips">
             <button class="chip" data-act="near" data-k="nearStation" aria-pressed="${q.nearStation}">${ico('train', 15)}역 근처</button>
             <button class="chip" data-act="near" data-k="nearUniv" aria-pressed="${q.nearUniv}">${ico('school', 15)}대학교 근처</button></div></div>
@@ -647,6 +646,7 @@
 
   // ---- 검색 결과 ---------------------------------------------------------------------
   const RADIUS_KM = [1, 3, 5, 10, 20, 30]; // 거리 기준 선택지
+  const clearGeo = (q) => { q.geo = null; if (q.autoRadius) { q.radius = 0; q.autoRadius = false; } }; // 내 주변을 끌 때, 자동으로 정했던 반경은 '제한 없음'으로 되돌린다
   const NEAR_DEFAULT_KM = 5; // 내 주변에서 카페를 불러올 때 기준으로 삼는 거리
   function results(ignoreRadius = false) {
     const q = S.q, v = qView(), org = origin();
@@ -736,7 +736,7 @@
     const loading = !!S.regionLoading, noKakao = !S.kakao && !D.cafes.some((c) => c.sido === q.sido && c.sigungu === q.sigungu);
     const empty = loading ? `<li class="empty"><h3>카카오맵에서 ${esc(q.sigungu)} 스터디카페를 불러오는 중이에요</h3><p class="muted">처음 보는 지역은 몇 초 걸려요. 한 번 불러온 지역은 다음부터 바로 보여요.</p></li>`
       : noKakao ? `<li class="empty"><h3>이 지역은 카카오맵 연결이 필요해요</h3><p class="muted">지도를 불러오지 못해 실제 카페 정보를 가져올 수 없어요. 잠시 뒤 다시 시도해 주세요.</p></li>`
-      : nearD != null ? `<li class="empty"><h3>반경 ${q.radius}km 안에는 카페가 없어요</h3><p class="muted">가장 가까운 카페는 ${S.me || q.geo ? '내 위치' : `${esc(q.sigungu)} 중심`}에서 ${km(nearD)} 떨어져 있어요.</p><button class="btn primary" data-act="noRadius">반경 제한 없음으로 보기</button></li>`
+      : nearD != null ? `<li class="empty"><h3>반경 ${q.radius}km 안에는 카페가 없어요</h3><p class="muted">가장 가까운 카페는 ${S.me || q.geo ? '내 위치' : `${esc(q.sigungu)} 중심`}에서 ${km(nearD)} 떨어져 있어요.</p>${q.geo ? (RADIUS_KM.find((k) => k >= nearD) ? `<button class="btn primary" data-act="setRadius" data-k="${RADIUS_KM.find((k) => k >= nearD)}">반경 ${RADIUS_KM.find((k) => k >= nearD)}km로 넓혀 보기</button>` : '<button class="btn primary" data-act="geo">내 위치 해제하고 지역 고르기</button>') : '<button class="btn primary" data-act="noRadius">반경 제한 없음으로 보기</button>'}</li>`
       : `<li class="empty"><h3>${q.fac.length ? '선택한 시설이 확인된 카페가 없어요' : '조건에 맞는 스터디카페가 없어요'}</h3><p class="muted">${q.fac.length ? '시설 정보 미확인은 시설이 없다는 뜻이 아니에요. 시설 조건을 해제하면 다른 카페도 볼 수 있어요.' : q.geo ? '내 주변에 카페가 없을 수 있어요. 지역을 직접 선택해 보세요.' : S.regionError === `${q.sido}|${q.sigungu}` ? '카카오맵에서 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.' : '이 지역에는 카카오맵에 등록된 스터디카페가 없거나, 조건에 맞는 곳이 없어요.'}</p><button class="btn primary" data-act="${q.fac.length ? 'clearFac' : 'reset'}">${q.fac.length ? '시설 조건 해제' : '조건 초기화'}</button></li>`;
     const hlIdx = list.findIndex((it) => it.c.id === S.hl);
     if (hlIdx >= S.limit) S.limit = hlIdx + 1; // 지도에서 고른 카페가 목록에 보이도록 목록을 그 위치까지 펼친다
@@ -1531,7 +1531,7 @@
     },
     homeSearch: (t, e, wantGeo = false) => { // 홈의 빠른 검색: 고른 지역·날짜·시간을 검색 조건에 적용 (wantGeo: '내 위치' 버튼)
       const [sido, sigungu] = ($('#hsRegion').value || '').split('|'), q = S.q;
-      if (!wantGeo && sido && sigungu) { q.sido = sido; q.sigungu = sigungu; q.geo = null; setCond(); }
+      if (!wantGeo && sido && sigungu) { q.sido = sido; q.sigungu = sigungu; clearGeo(q); setCond(); }
       q.date = $('#hsDate').value || todayStr();
       q.start = Number($('#hsStart').value);
       if (q.end <= q.start) q.end = Math.min(q.start + 3, 24);
@@ -1584,11 +1584,12 @@
     clearFac: () => { S.q.fac = []; afterQuery(); },
     // ② 지역
     near: (t) => { S.q[t.dataset.k] = !S.q[t.dataset.k]; afterQuery(); },
-    noRadius: () => { S.q.radius = 0; afterQuery(); }, // 반경 제한 없음으로 되돌린다
+    noRadius: () => { S.q.radius = 0; S.q.autoRadius = false; afterQuery(); }, // 반경 제한 없음으로 되돌린다
+    setRadius: (t) => { S.q.radius = Number(t.dataset.k); S.q.autoRadius = false; afterQuery(); ensureNear(S.q.geo || origin(), S.q.radius).finally(() => onRealLoaded()); }, // 내 주변: 반경을 넓힌다
     // '내 주변' 모드를 켜고 끈다. 끄면 고른 지역만 보여주되, 거리는 계속 현재 위치에서 잰다.
     geo: () => {
-      if (S.q.geo) { S.q.geo = null; afterQuery(); return; }
-      const on = () => { S.q.geo = S.me; setCond(); afterQuery(); ensureNear(S.me, S.q.radius || NEAR_DEFAULT_KM).finally(() => onRealLoaded()); };
+      if (S.q.geo) { clearGeo(S.q); afterQuery(); return; }
+      const on = () => { S.q.geo = S.me; if (!S.q.radius) { S.q.radius = NEAR_DEFAULT_KM; S.q.autoRadius = true; } setCond(); afterQuery(); ensureNear(S.me, S.q.radius || NEAR_DEFAULT_KM).finally(() => onRealLoaded()); };
       if (S.me) { on(); return; }
       toast('위치를 확인하는 중이에요…');
       applyLocation().then((ok) => { if (ok) on(); });
@@ -1604,7 +1605,7 @@
     reset: () => { resetSearch(); clearCond(); document.querySelectorAll('.cat').forEach((b) => b.setAttribute('aria-pressed', 'false')); afterQuery(); },
     // ③ 비교·추천
     region: (t) => {
-      S.q.sido = t.dataset.s; S.q.sigungu = t.dataset.g; S.q.geo = null; rememberRegion(); afterQuery();
+      S.q.sido = t.dataset.s; S.q.sigungu = t.dataset.g; clearGeo(S.q); rememberRegion(); afterQuery();
       const pr = ensureRegion(regionOf()); renderResults(); pr.finally(() => onRealLoaded()); // 고른 구를 불러온다
     },
     sort: (t) => { S.q.sort = t.dataset.v; S.limit = PAGE; renderResults(); },
@@ -1715,9 +1716,9 @@
     if (t.dataset.q) { // 검색 패널 입력
       const k = t.dataset.q, q = S.q;
       if (k === 'date') q.date = t.value || todayStr();
-      else if (k === 'sido') { q.sido = t.value; q.sigungu = D.regions.find((r) => r.sido === t.value).sigungu; q.geo = null; setCond(); }
-      else if (k === 'sigungu') { q.sigungu = t.value; q.geo = null; setCond(); }
-      else if (k === 'radius') q.radius = Number(t.value);
+      else if (k === 'sido') { q.sido = t.value; q.sigungu = D.regions.find((r) => r.sido === t.value).sigungu; clearGeo(q); setCond(); }
+      else if (k === 'sigungu') { q.sigungu = t.value; clearGeo(q); setCond(); }
+      else if (k === 'radius') { q.radius = Number(t.value); q.autoRadius = false; }
       else if (k === 'start') { q.start = Number(t.value); if (q.end <= q.start) q.end = q.start + 1; }
       else if (k === 'end') q.end = Number(t.value);
       else if (k === 'plan') q.plan = t.value;
