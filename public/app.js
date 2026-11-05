@@ -334,6 +334,7 @@
 
   // ---- 후기 ------------------------------------------------------------------------
   const reviewsOf = (c) => [...(API.on ? (SV.reviews.get(c.id) || []) : DB.reviews.filter((r) => r.cafeId === c.id)), ...c.reviews].sort((a, b) => b.date.localeCompare(a.date));
+  const reviewText = (r) => r.text && r.text.startsWith('[시연용 예시 후기]') ? '' : r.text;
   async function loadReviews(c) { // 서버 모드: 이 카페의 실제 후기를 불러와 후기 영역만 다시 그린다
     try {
       const rows = await api('GET', `/api/cafes/by-place/${encodeURIComponent(placeIdOf(c))}/reviews`);
@@ -341,7 +342,24 @@
       const el = $('#sec-rev'); if (el && S.book && S.book.cafeId === c.id) el.innerHTML = `<h2>${ico('book', 20)}이용 후기</h2>${reviewBlock(c)}`;
     } catch { /* 후기를 못 불러와도 상세는 보인다 */ }
   }
-  const ratingOf = (c) => { const l = reviewsOf(c); return { avg: l.length ? l.reduce((s, r) => s + r.rating, 0) / l.length : 0, n: l.length }; };
+  const ratingSummaries = new Map();
+  let ratingSummaryLoadedAt = 0, ratingSummaryRetryAt = 0, ratingSummaryPending = null;
+  function loadRatingSummaries() {
+    if (!API.on || ratingSummaryPending || Date.now() < ratingSummaryRetryAt || Date.now() - ratingSummaryLoadedAt < 60000) return;
+    ratingSummaryPending = api('GET', '/api/cafes/ratings').then((rows) => {
+      if (!Array.isArray(rows) || rows.some((r) => !Number.isFinite(r.avg_rating) || !Number.isInteger(r.review_count) || r.review_count < 1)) throw new Error('Invalid ratings');
+      ratingSummaries.clear();
+      rows.forEach((r) => ratingSummaries.set(String(r.place_id), { avg: r.avg_rating, n: r.review_count, demo: r.demo_count > 0 }));
+      ratingSummaryLoadedAt = Date.now();
+      renderResults();
+    }).catch(() => { ratingSummaryRetryAt = Date.now() + 30000; }).finally(() => { ratingSummaryPending = null; });
+  }
+  const ratingOf = (c) => {
+    const summary = API.on && ratingSummaries.get(String(placeIdOf(c)));
+    if (summary && !SV.reviews.has(c.id)) return summary;
+    const l = reviewsOf(c);
+    return { avg: l.length ? l.reduce((s, r) => s + r.rating, 0) / l.length : 0, n: l.length, demo: l.some((r) => r.text && r.text.startsWith('[시연용 예시 후기]')) };
+  };
   const starsHtml = (n) => `<span class="stars" aria-label="별점 ${n}점">${'★'.repeat(Math.round(n))}<span class="off">${'★'.repeat(5 - Math.round(n))}</span></span>`;
   const maskName = (n) => (n.length >= 3 ? n[0] + '*'.repeat(n.length - 2) + n[n.length - 1] : n[0] + '*');
 
@@ -632,7 +650,7 @@
   }
   function recentReviews() {
     const all = D.cafes.flatMap((c) => reviewsOf(c).map((r) => ({ ...r, c }))).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
-    return all.map((r) => `<button class="revcard" data-act="open" data-id="${r.c.id}">${starsHtml(r.rating)}<div>${esc(r.text)}</div><div class="who">${esc(r.name)} · ${esc(r.c.name)} · ${esc(r.date)}</div></button>`).join('');
+    return all.map((r) => `<button class="revcard" data-act="open" data-id="${r.c.id}">${starsHtml(r.rating)}<div>${esc(reviewText(r))}</div><div class="who">${esc(r.name)} · ${esc(r.c.name)} · ${esc(r.date)}</div></button>`).join('');
   }
 
   // ---- 검색 결과 ---------------------------------------------------------------------
@@ -714,6 +732,7 @@
   function renderResults() {
     const box = $('#results');
     if (!box) return;
+    loadRatingSummaries();
     let list = results();
     const v = qView(), q = S.q;
     // 반경을 걸었는데 비면 반경 밖 카페를 섞어 보여주지 않고, 가장 가까운 곳까지의 거리를 알려준다
@@ -737,7 +756,8 @@
     const t0 = !q.geo && S.regionTime.get(regKey(regionOf()));
     const asof = t0 && realMode() ? `카카오맵 ${ago(t0)} 기준` : '';
     const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.quick.map(([sd, sg]) => `<button class="chip" data-act="region" data-s="${esc(sd)}" data-g="${esc(sg)}" aria-pressed="${!q.geo && q.sido === sd && q.sigungu === sg}">${esc(sg)}</button>`).join('')}</div>`;
-    box.innerHTML = `${locNote}${realNote}${avgStrip(list)}
+    const ratingNote = list.some((it) => it.r.demo) ? '<p class="note">과제 시연용 평점·후기 포함</p>' : '';
+    box.innerHTML = `${locNote}${realNote}${ratingNote}${avgStrip(list)}
       <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}${asof ? ` · ${asof}` : ''}</small></div>
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
           <button class="tab map-toggle" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} ${q.view === 'map' ? '목록만 보기' : '지도로 보기'}</button></div></div>
@@ -1138,9 +1158,9 @@
   function reviewBlock(c) {
     const l = reviewsOf(c), r = ratingOf(c);
     const dist5 = [5, 4, 3, 2, 1].map((n) => [n, l.filter((x) => x.rating === n).length]);
-    return `<div class="revhead"><div><div class="num">${r.n ? r.avg.toFixed(1) : '-'}</div>${starsHtml(r.avg)}<div class="muted" style="font-size:13px">후기 ${r.n}개</div></div>
+    return `${r.demo ? '<p class="note">과제 시연용 평점·후기 포함</p>' : ''}<div class="revhead"><div><div class="num">${r.n ? r.avg.toFixed(1) : '-'}</div>${starsHtml(r.avg)}<div class="muted" style="font-size:13px">후기 ${r.n}개</div></div>
       <div style="flex:1;min-width:180px;display:grid;gap:3px;font-size:12.5px">${dist5.map(([n, k]) => `<div style="display:flex;align-items:center;gap:8px"><span style="width:24px">${n}점</span><span style="flex:1;height:6px;border-radius:9px;background:var(--line);overflow:hidden"><span style="display:block;height:100%;width:${l.length ? (k / l.length) * 100 : 0}%;background:var(--gold)"></span></span><span style="width:20px;text-align:right" class="muted">${k}</span></div>`).join('')}</div></div>
-      ${l.map((x) => `<div class="revitem"><div class="top">${starsHtml(x.rating)}<span>${esc(x.name)}</span><span>${esc(x.date)}</span></div><div>${esc(x.text)}</div></div>`).join('')}`;
+      ${l.map((x) => `<div class="revitem"><div class="top">${starsHtml(x.rating)}<span>${esc(x.name)}</span><span>${esc(x.date)}</span></div><div>${esc(reviewText(x))}</div></div>`).join('')}`;
   }
 
   function refreshBook() { renderSeats(); renderBook(); }

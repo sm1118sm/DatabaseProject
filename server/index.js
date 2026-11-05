@@ -253,6 +253,18 @@ app.get('/api/cafes', wrap(async (req, res) => {
   })));
 }));
 
+// 카카오 장소 번호로 목록의 평점을 연결한다. 상세를 열기 전에도 정렬에 사용한다.
+app.get('/api/cafes/ratings', wrap(async (req, res) => {
+  const [rows] = await pool.query(
+    `SELECT c.kakao_place_id AS place_id, AVG(rv.rating) AS avg_rating,
+            COUNT(*) AS review_count,
+            SUM(CASE WHEN rv.content LIKE '[시연용 예시 후기]%' THEN 1 ELSE 0 END) AS demo_count
+     FROM review rv JOIN cafe c ON c.cafe_id = rv.cafe_id
+     WHERE c.is_active = 1 AND c.kakao_place_id REGEXP '^[0-9]+$'
+     GROUP BY c.kakao_place_id`);
+  res.json(rows.map((r) => ({ place_id: String(r.place_id), avg_rating: Number(r.avg_rating), review_count: Number(r.review_count), demo_count: Number(r.demo_count) })));
+}));
+
 // ---- 카페 상세 -------------------------------------------------------------
 app.get('/api/cafes/:id(\\d+)', wrap(async (req, res) => {
   const id = Number(req.params.id);
