@@ -10,7 +10,7 @@
 erDiagram
   MEMBER ||--o{ RESERVATION : "예약한다"
   MEMBER ||--o{ REVIEW : "작성한다"
-  MEMBER ||--o{ POINT_LEDGER : "적립·사용"
+  MEMBER ||--o{ POINT_HISTORY : "적립·사용"
   REGION ||--o{ CAFE : "속한다"
   CAFE ||--o{ SEAT : "보유한다"
   CAFE ||--o{ PRICE_PLAN : "요금제를 가진다"
@@ -22,7 +22,7 @@ erDiagram
   RESERVATION ||--o{ RESERVATION_SLOT : "시간을 점유"
   RESERVATION ||--o| PAYMENT : "결제된다"
   RESERVATION |o--o| REVIEW : "후기의 근거"
-  RESERVATION |o--o{ POINT_LEDGER : "포인트 변동"
+  RESERVATION |o--o{ POINT_HISTORY : "포인트 변동"
 
   MEMBER {
     bigint member_id PK
@@ -115,7 +115,7 @@ erDiagram
     int refund_amount "취소 시 환불액"
     datetime paid_at
   }
-  POINT_LEDGER {
+  POINT_HISTORY {
     bigint point_id PK
     bigint member_id FK
     bigint reservation_id FK
@@ -141,7 +141,7 @@ erDiagram
 | 이용 옵션 선택 | 시간제/기간제, 좌석 유형, 인원 | SEAT_TYPE, SEAT, PRICE_PLAN |
 | 지역 설정 | 시·도·구 선택, 현재 위치, 역·대학 근처(카카오 검색으로 화면에서 계산, DB에 저장하지 않음) | REGION, CAFE |
 | 비교 및 추천 | 구 평균 대비 요금, 후기 | PRICE_PLAN, REVIEW, CAFE, REGION |
-| 고객 예약 | 좌석 선택, 결제, 변경·취소·환불, 내 예약, 포인트 | MEMBER, RESERVATION, RESERVATION_SLOT, PAYMENT, POINT_LEDGER |
+| 고객 예약 | 좌석 선택, 결제, 변경·취소·환불, 내 예약, 포인트 | MEMBER, RESERVATION, RESERVATION_SLOT, PAYMENT, POINT_HISTORY |
 | 회원 관리 | 가입(휴대폰 인증·중복 차단), 로그인 | MEMBER, PHONE_VERIFICATION |
 
 ## 핵심 설계 결정
@@ -151,7 +151,7 @@ erDiagram
 3. **카카오에서 가져온 정보에는 출처 시각을 남긴다.** `CAFE.info_source`, `fetched_at`, `kakao_place_id`(중복 방지 UK), `place_url`. 카카오는 요금·좌석 정보를 주지 않으므로 이 값들은 별도로 관리한다.
 4. **좌석을 낱개로 둔다.** 사이트가 "일반석 12번"처럼 번호별로 고르게 하므로 `SEAT` 한 행이 좌석 하나다. 유형은 `SEAT_TYPE`(일반석·집중석·스터디룸)으로 분리해 `PRICE_PLAN`과 같은 기준으로 연결한다.
 5. **범위를 단순화한다.** 카페 찜과 시설별 관리·검색을 제외해 N:M 연결 테이블은 없다. 평균 대비 표시·정렬은 유지하며 뷰 대신 일반 SQL과 화면 계산을 사용한다.
-6. **포인트는 잔액 + 원장.** `MEMBER.point_balance`는 조회용 값이고, 변동 이력은 `POINT_LEDGER`에 쌓는다. 포인트 결제는 `PAYMENT.method = POINT`와 원장 `-` 행이 한 쌍이다. 잔액은 0 미만이 될 수 없다(CHECK).
+6. **포인트는 잔액 + 내역.** `MEMBER.point_balance`는 조회용 값이고, 변동 이력은 `POINT_HISTORY`에 쌓는다. 포인트 결제는 `PAYMENT.method = POINT`와 내역의 `-` 행이 한 쌍이다. 잔액은 0 미만이 될 수 없다(CHECK).
 7. **중복 가입을 DB에서 막는다.** 이메일(`uq_member_email`)과 휴대폰 번호(`uq_member_phone`)가 각각 유일하다. 서버는 이메일을 소문자로 정리하고 번호는 숫자만 저장해 표기 차이로 우회하지 못하게 한다.
 8. **휴대폰 인증은 코드를 해시로만 저장한다.** `PHONE_VERIFICATION`은 만료(5분)와 시도 횟수(5회)를 제한하고, 인증을 마친 번호만 15분 안에 가입할 수 있으며, 가입이 끝나면 인증 기록을 지워 재사용을 막는다. 실제 문자 발송 업체는 연결하지 않아 모의 모드로 동작한다.
 9. **환불은 결제에 기록한다.** 시간제는 이용 1시간 전까지 100%, 이후 50%, 기간제는 시작 전 100%이며 결제 행의 `refund_amount`에 남긴다. 포인트로 결제했다면 같은 금액을 포인트로 돌려준다.
@@ -161,7 +161,7 @@ erDiagram
 
 | 구분 | 내용 |
 |---|---|
-| 추가 | `SEAT_TYPE`, `POINT_LEDGER`, `PHONE_VERIFICATION` |
+| 추가 | `SEAT_TYPE`, `POINT_HISTORY`, `PHONE_VERIFICATION` |
 | 이름 변경 | `room` → `seat` (낱개 좌석과 룸을 모두 담으므로) |
 | 컬럼 추가 | `cafe.place_url·info_source·fetched_at·is_active`, `region.center_lat·center_lng`, `price_plan.price_source·source_note·verified_at`, `member.point_balance·phone_verified`, `reservation.updated_at`, `payment.refund_amount`, `payment.method`에 `KAKAO` |
 | 규칙 변경 | `member.phone`을 유일(UNIQUE)로 |

@@ -554,9 +554,9 @@
 <!-- point -->
 <g id="entity_point" class="node">
 <title>point</title>
-<g id="a_entity_point"><a xlink:title="POINT_LEDGER">
+<g id="a_entity_point"><a xlink:title="POINT_HISTORY">
 <polygon fill="#edf4ff" stroke="#1d4d83" stroke-width="1.3" points="788.6,-1194.1 695.8,-1194.1 695.8,-1156.18 788.6,-1156.18 788.6,-1194.1"/>
-<text xml:space="preserve" text-anchor="middle" x="742.2" y="-1170.34" font-family="Malgun Gothic" font-size="16.00" fill="#173450">포인트 원장</text>
+<text xml:space="preserve" text-anchor="middle" x="742.2" y="-1170.34" font-family="Malgun Gothic" font-size="16.00" fill="#173450">포인트 내역</text>
 </a>
 </g>
 </g>

@@ -163,8 +163,8 @@ CREATE TABLE payment (
   CONSTRAINT ck_payment_refund CHECK (refund_amount IS NULL OR (refund_amount >= 0 AND refund_amount <= amount))
 ) ENGINE=InnoDB;
 
--- 포인트 원장 (적립 +, 사용 -). member.point_balance 는 이 합계의 조회용 값
-CREATE TABLE point_ledger (
+-- 포인트 내역 (적립 +, 사용 -). member.point_balance 는 이 합계의 조회용 값
+CREATE TABLE point_history (
   point_id       BIGINT       NOT NULL AUTO_INCREMENT,
   member_id      BIGINT       NOT NULL,
   reservation_id BIGINT,

@@ -183,7 +183,7 @@ app.post('/api/signup', limit('signup', 15, 3600e3), wrap(async (req, res) => {
     if (!ver) { await conn.rollback(); return res.status(400).json({ error: '휴대폰 인증을 먼저 완료해 주세요.' }); }
     const [ins] = await conn.query(
       'INSERT INTO member (email, password_hash, name, phone, phone_verified, point_balance) VALUES (?, ?, ?, ?, TRUE, ?)', [email, hash, name, phone, SIGNUP_BONUS]);
-    await conn.query('INSERT INTO point_ledger (member_id, delta, reason) VALUES (?, ?, ?)', [ins.insertId, SIGNUP_BONUS, '가입 보너스']);
+    await conn.query('INSERT INTO point_history (member_id, delta, reason) VALUES (?, ?, ?)', [ins.insertId, SIGNUP_BONUS, '가입 보너스']);
     await conn.query('DELETE FROM phone_verification WHERE phone = ?', [phone]); // 한 번 쓴 인증은 다시 쓰지 못한다
     await conn.commit();
     const m = { member_id: ins.insertId, email, name, point_balance: SIGNUP_BONUS, phone_verified: 1 };
@@ -213,7 +213,7 @@ app.get('/api/me', auth, wrap(async (req, res) => {
   const [[m]] = await pool.query('SELECT member_id, email, name, phone, phone_verified, point_balance FROM member WHERE member_id = ?', [req.member.memberId]);
   if (!m) return res.status(401).json({ error: '로그인이 필요합니다.' });
   const [points] = await pool.query(
-    'SELECT delta, reason, created_at FROM point_ledger WHERE member_id = ? ORDER BY created_at DESC, point_id DESC LIMIT 20', [req.member.memberId]);
+    'SELECT delta, reason, created_at FROM point_history WHERE member_id = ? ORDER BY created_at DESC, point_id DESC LIMIT 20', [req.member.memberId]);
   res.json({ member: m, ...publicMember(m), history: points });
 }));
 
@@ -475,8 +475,8 @@ app.post('/api/reservations', auth, requireVerified, bookingWrap(async (req, res
     await conn.query(`INSERT INTO payment (reservation_id, amount, method, status) VALUES (?, ?, ?, 'PAID')`, [reservationId, total, payMethod]);
 
     let delta = 0;
-    if (payMethod === 'POINT') { delta = -total; await conn.query('INSERT INTO point_ledger (member_id, reservation_id, delta, reason) VALUES (?, ?, ?, ?)', [req.member.memberId, reservationId, -total, '예약 결제']); }
-    else if (Math.floor(total * 0.01) > 0) { delta = Math.floor(total * 0.01); await conn.query('INSERT INTO point_ledger (member_id, reservation_id, delta, reason) VALUES (?, ?, ?, ?)', [req.member.memberId, reservationId, delta, '결제 적립 1%']); }
+    if (payMethod === 'POINT') { delta = -total; await conn.query('INSERT INTO point_history (member_id, reservation_id, delta, reason) VALUES (?, ?, ?, ?)', [req.member.memberId, reservationId, -total, '예약 결제']); }
+    else if (Math.floor(total * 0.01) > 0) { delta = Math.floor(total * 0.01); await conn.query('INSERT INTO point_history (member_id, reservation_id, delta, reason) VALUES (?, ?, ?, ?)', [req.member.memberId, reservationId, delta, '결제 적립 1%']); }
     if (delta) await conn.query('UPDATE member SET point_balance = point_balance + ? WHERE member_id = ?', [delta, req.member.memberId]);
     const [[bal]] = await conn.query('SELECT point_balance FROM member WHERE member_id = ?', [req.member.memberId]);
 
@@ -534,7 +534,7 @@ app.post('/api/reservations/:id(\\d+)/cancel', auth, wrap(async (req, res) => {
     await conn.query("UPDATE payment SET status = 'REFUNDED', refund_amount = ? WHERE reservation_id = ?", [refund, id]);
     if (pay.method === 'POINT' && refund > 0) { // 포인트로 결제했다면 포인트로 돌려준다
       await conn.query('UPDATE member SET point_balance = point_balance + ? WHERE member_id = ?', [refund, req.member.memberId]);
-      await conn.query('INSERT INTO point_ledger (member_id, reservation_id, delta, reason) VALUES (?, ?, ?, ?)', [req.member.memberId, id, refund, '예약 취소 환불']);
+      await conn.query('INSERT INTO point_history (member_id, reservation_id, delta, reason) VALUES (?, ?, ?, ?)', [req.member.memberId, id, refund, '예약 취소 환불']);
     }
     const [[bal]] = await conn.query('SELECT point_balance FROM member WHERE member_id = ?', [req.member.memberId]);
     await conn.commit();
@@ -578,7 +578,7 @@ app.put('/api/reservations/:id(\\d+)', auth, bookingWrap(async (req, res) => {
     await conn.query('UPDATE payment SET amount = ? WHERE reservation_id = ?', [total, id]);
     if (pay.method === 'POINT' && diff !== 0) {
       await conn.query('UPDATE member SET point_balance = point_balance - ? WHERE member_id = ?', [diff, req.member.memberId]);
-      await conn.query('INSERT INTO point_ledger (member_id, reservation_id, delta, reason) VALUES (?, ?, ?, ?)', [req.member.memberId, id, -diff, '예약 변경 차액']);
+      await conn.query('INSERT INTO point_history (member_id, reservation_id, delta, reason) VALUES (?, ?, ?, ?)', [req.member.memberId, id, -diff, '예약 변경 차액']);
     }
     const [[bal]] = await conn.query('SELECT point_balance FROM member WHERE member_id = ?', [req.member.memberId]);
     await conn.commit();
