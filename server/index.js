@@ -113,7 +113,6 @@ app.get('/api/config', (req, res) => {
   res.json({
     server: true,
     kakaoJsKey: process.env.KAKAO_JS_KEY || '',
-    social: { KAKAO: !!process.env.KAKAO_REST_KEY, NAVER: !!(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET) },
   });
 });
 
@@ -222,178 +221,6 @@ app.get('/api/me', auth, wrap(async (req, res) => {
   res.json({ member: m, ...publicMember(m), history: points });
 }));
 
-// ---- 소셜 가입 뒤 휴대폰 인증 (보너스 지급 · 같은 번호의 기존 계정과 연결) -------------------
-// 소셜로 막 가입한 회원은 휴대폰이 없다. 인증번호로 번호를 확인한 뒤 번호를 저장하고 가입 보너스를 준다.
-// 그 번호로 이미 가입한 계정이 있으면 새 계정을 만들지 않고 그 계정에 소셜 계정을 연결한다.
-// 단, 인증번호가 화면에 그대로 보이는 모의 모드에서는 번호만으로 남의 계정을 가로챌 수 있으므로 기존 계정의 비밀번호도 함께 확인한다.
-app.post('/api/me/phone/send', auth, limit('phone', 10, 3600e3), wrap(async (req, res) => {
-  const phone = normPhone(req.body && req.body.phone);
-  if (!phoneOk(phone)) return res.status(400).json({ error: '휴대폰 번호 형식을 확인해 주세요. (예: 010-1234-5678)' });
-  const [[me]] = await pool.query('SELECT phone_verified FROM member WHERE member_id = ?', [req.member.memberId]);
-  if (!me) return res.status(401).json({ error: '로그인이 필요합니다.' });
-  if (me.phone_verified) return res.status(400).json({ error: '이미 휴대폰 인증을 마쳤어요.' });
-  const [[recent]] = await pool.query('SELECT COUNT(*) AS n FROM phone_verification WHERE phone = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)', [phone]);
-  if (recent.n >= 5) return res.status(429).json({ error: '인증번호 요청이 너무 많아요. 잠시 뒤 다시 시도해 주세요.' });
-  if (process.env.SMS_PROVIDER) return res.status(501).json({ error: '문자 발송 업체가 아직 연결되지 않았어요.' });
-  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-  await pool.query('INSERT INTO phone_verification (phone, code_hash, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 5 MINUTE))', [phone, codeHash(phone, code)]);
-  const [[other]] = await pool.query('SELECT password_hash FROM member WHERE phone = ? AND member_id <> ?', [phone, req.member.memberId]);
-  res.json({ ok: true, expiresInSec: 300, mock: true, devCode: code, existing: !!other, needsPassword: !!(other && other.password_hash) });
-}));
-
-app.post('/api/me/phone/verify', auth, limit('verify', 40, 3600e3), wrap(async (req, res) => {
-  const phone = normPhone(req.body && req.body.phone), code = String((req.body && req.body.code) || '').trim(), password = String((req.body && req.body.password) || '');
-  const [[v]] = await pool.query(
-    'SELECT verify_id, code_hash, attempts FROM phone_verification WHERE phone = ? AND verified_at IS NULL AND expires_at > NOW() ORDER BY verify_id DESC LIMIT 1', [phone]);
-  if (!v) return res.status(400).json({ error: '인증번호가 만료됐어요. 다시 요청해 주세요.' });
-  if (v.attempts >= 5) return res.status(429).json({ error: '시도 횟수를 넘었어요. 인증번호를 다시 요청해 주세요.' });
-  const fail = async (status, body) => { // 실패도 시도 횟수에 세어 인증번호·비밀번호를 무작정 넣어 보는 것을 막는다
-    await pool.query('UPDATE phone_verification SET attempts = attempts + 1 WHERE verify_id = ?', [v.verify_id]);
-    return res.status(status).json(body);
-  };
-  if (v.code_hash !== codeHash(phone, code)) return fail(400, { error: '인증번호가 맞지 않아요.' });
-
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const [[mine]] = await conn.query('SELECT member_id, email, name, phone_verified FROM member WHERE member_id = ? FOR UPDATE', [req.member.memberId]);
-    if (!mine) { await conn.rollback(); return res.status(401).json({ error: '로그인이 필요합니다.' }); }
-    if (mine.phone_verified) { await conn.rollback(); return res.status(400).json({ error: '이미 휴대폰 인증을 마쳤어요.' }); }
-    const [[other]] = await conn.query('SELECT member_id, email, name, password_hash, point_balance, phone_verified FROM member WHERE phone = ? AND member_id <> ? FOR UPDATE', [phone, mine.member_id]);
-
-    if (!other) { // 새 번호: 저장하고 가입 보너스를 준다
-      await conn.query('UPDATE member SET phone = ?, phone_verified = TRUE, point_balance = point_balance + ? WHERE member_id = ?', [phone, SIGNUP_BONUS, mine.member_id]);
-      await conn.query('INSERT INTO point_ledger (member_id, delta, reason) VALUES (?, ?, ?)', [mine.member_id, SIGNUP_BONUS, '가입 보너스']);
-      await conn.query('UPDATE phone_verification SET verified_at = NOW() WHERE verify_id = ?', [v.verify_id]);
-      const [[m]] = await conn.query('SELECT member_id, email, name, point_balance, phone_verified FROM member WHERE member_id = ?', [mine.member_id]);
-      await conn.commit();
-      return res.json({ ok: true, merged: false, ...publicMember(m) });
-    }
-
-    // 이미 이 번호로 가입한 계정이 있다: 새 계정을 만들지 않고 그 계정에 소셜 계정을 연결한다
-    if (!other.password_hash) { // 비밀번호가 없는 소셜 전용 계정은 실제 문자 인증이 있을 때만 연결한다
-      if (!process.env.SMS_PROVIDER) {
-        await conn.rollback();
-        return fail(409, { error: '그 번호는 소셜 로그인으로만 가입한 계정이라 지금은 연결할 수 없어요.' });
-      }
-    } else if (!password || !(await bcrypt.compare(password, other.password_hash))) {
-      await conn.rollback();
-      return fail(409, { error: '이미 가입된 번호예요. 그 계정의 비밀번호를 입력해 주세요.', needsPassword: true });
-    }
-    const [[clash]] = await conn.query(
-      'SELECT 1 AS x FROM member_social a JOIN member_social b ON a.provider = b.provider WHERE a.member_id = ? AND b.member_id = ? LIMIT 1', [other.member_id, mine.member_id]);
-    if (clash) { await conn.rollback(); return res.status(409).json({ error: '그 계정에는 같은 종류의 소셜 계정이 이미 연결돼 있어요.' }); }
-    const [[used]] = await conn.query('SELECT COUNT(*) AS n FROM reservation WHERE member_id = ?', [mine.member_id]);
-    if (used.n) { await conn.rollback(); return res.status(409).json({ error: '이미 이용 내역이 있는 계정이라 연결할 수 없어요.' }); }
-    await conn.query('UPDATE member_social SET member_id = ? WHERE member_id = ?', [other.member_id, mine.member_id]);
-    await conn.query('DELETE FROM member WHERE member_id = ?', [mine.member_id]); // 인증 전에 만들어진 빈 계정은 지운다 (보너스도 받지 않은 상태)
-    await conn.query('UPDATE phone_verification SET verified_at = NOW() WHERE verify_id = ?', [v.verify_id]);
-    await conn.commit();
-    res.json({ ok: true, merged: true, token: newSession(other), ...publicMember(other) }); // 이 로그인은 이제 기존 계정으로 이어진다 (새 토큰)
-  } catch (e) {
-    await conn.rollback();
-    throw e;
-  } finally {
-    conn.release();
-  }
-}));
-
-// ---- 소셜 로그인 (카카오·네이버) ---------------------------------------------
-// 카카오 개발자 콘솔에서 '카카오 로그인'을 켜고 Redirect URI 를 등록해야 동작한다. 네이버는 NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 이 필요하다.
-// 같은 소셜 계정은 한 회원에만 연결된다 (member_social 의 기본키).
-const baseUrl = (req) => process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
-const PROVIDERS = {
-  KAKAO: {
-    enabled: () => !!process.env.KAKAO_REST_KEY,
-    authorize: (req, state) => `https://kauth.kakao.com/oauth/authorize?${new URLSearchParams({ client_id: process.env.KAKAO_REST_KEY, redirect_uri: `${baseUrl(req)}/api/auth/kakao/callback`, response_type: 'code', state })}`,
-    async profile(req, code) {
-      const tok = await (await fetch('https://kauth.kakao.com/oauth/token', {
-        method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded;charset=utf-8' },
-        body: new URLSearchParams({ grant_type: 'authorization_code', client_id: process.env.KAKAO_REST_KEY, redirect_uri: `${baseUrl(req)}/api/auth/kakao/callback`, code, ...(process.env.KAKAO_CLIENT_SECRET ? { client_secret: process.env.KAKAO_CLIENT_SECRET } : {}) }),
-      })).json();
-      if (!tok.access_token) throw new Error('kakao token');
-      const me = await (await fetch('https://kapi.kakao.com/v2/user/me', { headers: { authorization: `Bearer ${tok.access_token}` } })).json();
-      if (!me.id) throw new Error('kakao profile');
-      const acc = me.kakao_account || {};
-      // 인증된 이메일만 쓴다. 인증되지 않은 이메일로 남의 계정에 자동 연결되는 것을 막는다.
-      return { id: String(me.id), name: (acc.profile && acc.profile.nickname) || '카카오 회원', email: (acc.is_email_valid && acc.is_email_verified && acc.email) || null, phone: null };
-    },
-  },
-  NAVER: {
-    enabled: () => !!(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET),
-    authorize: (req, state) => `https://nid.naver.com/oauth2.0/authorize?${new URLSearchParams({ response_type: 'code', client_id: process.env.NAVER_CLIENT_ID, redirect_uri: `${baseUrl(req)}/api/auth/naver/callback`, state })}`,
-    async profile(req, code, state) {
-      const tok = await (await fetch(`https://nid.naver.com/oauth2.0/token?${new URLSearchParams({ grant_type: 'authorization_code', client_id: process.env.NAVER_CLIENT_ID, client_secret: process.env.NAVER_CLIENT_SECRET, code, state })}`)).json();
-      if (!tok.access_token) throw new Error('naver token');
-      const me = (await (await fetch('https://openapi.naver.com/v1/nid/me', { headers: { authorization: `Bearer ${tok.access_token}` } })).json()).response;
-      if (!me || !me.id) throw new Error('naver profile');
-      return { id: String(me.id), name: me.name || me.nickname || '네이버 회원', email: me.email || null, phone: normPhone(me.mobile) || null };
-    },
-  },
-};
-
-app.get('/api/auth/:provider/start', (req, res) => {
-  const p = PROVIDERS[String(req.params.provider).toUpperCase()];
-  if (!p) return res.status(404).json({ error: '지원하지 않는 로그인 방식이에요.' });
-  if (!p.enabled()) return res.status(501).json({ error: '이 소셜 로그인은 아직 설정되지 않았어요.' });
-  // state 는 서명해서 서버에 저장하지 않고, 같은 값(nonce)을 이 브라우저의 쿠키에도 둔다. 돌아올 때 둘이 같아야 한다 (남이 시작한 로그인으로 낚는 것을 막는다).
-  const nonce = crypto.randomBytes(16).toString('hex');
-  const state = sign({ t: 'o', p: String(req.params.provider).toUpperCase(), n: nonce, exp: Date.now() + 10 * 60e3 });
-  res.setHeader('Set-Cookie', `oauth_nonce=${nonce}; Path=/api/auth; Max-Age=600; HttpOnly; SameSite=Lax${req.secure || req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : ''}`);
-  res.redirect(p.authorize(req, state));
-});
-
-app.get('/api/auth/:provider/callback', wrap(async (req, res) => {
-  const name = String(req.params.provider).toUpperCase(), p = PROVIDERS[name];
-  const st = unsign(String(req.query.state || ''), 'o');
-  const cookieNonce = (/(?:^|;\s*)oauth_nonce=([0-9a-f]+)/.exec(req.headers.cookie || '') || [])[1];
-  res.setHeader('Set-Cookie', 'oauth_nonce=; Path=/api/auth; Max-Age=0; HttpOnly; SameSite=Lax'); // 한 번 쓰면 지운다
-  const fail = (m) => res.redirect(`/#login-error=${encodeURIComponent(m)}`);
-  if (!p || !st || st.p !== name || !cookieNonce || st.n !== cookieNonce) return fail('로그인 요청이 만료됐어요. 다시 시도해 주세요.');
-  if (!req.query.code) return fail('로그인을 취소했어요.');
-  let prof;
-  try { prof = await p.profile(req, String(req.query.code), String(req.query.state)); } catch { return fail('소셜 로그인에 실패했어요. 설정을 확인해 주세요.'); }
-
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const [[linked]] = await conn.query(
-      `SELECT m.member_id, m.email, m.name, m.point_balance, m.phone_verified FROM member_social s JOIN member m ON m.member_id = s.member_id
-       WHERE s.provider = ? AND s.provider_user_id = ?`, [name, prof.id]);
-    let m = linked;
-    if (!m) { // 처음 오는 소셜 계정: 같은 이메일·휴대폰으로 이미 가입했다면 새로 만들지 않고 그 회원에 연결한다 (중복 가입 방지)
-      const email = prof.email ? prof.email.toLowerCase() : `${name.toLowerCase()}_${prof.id}@social.invalid`;
-      const [[ex]] = await conn.query('SELECT member_id, email, name, point_balance, phone_verified FROM member WHERE email = ? OR (? IS NOT NULL AND phone = ?) LIMIT 1', [email, prof.phone, prof.phone]);
-      if (ex) m = ex;
-      else {
-        // 휴대폰이 확인되지 않은 소셜 가입자는 보너스 없이 만들고, 휴대폰 인증을 마쳤을 때 준다 (소셜 계정을 여러 개 만들어 보너스를 받는 것을 막는다)
-        const verified = prof.phone ? 1 : 0, bonus = verified ? SIGNUP_BONUS : 0;
-        const [ins] = await conn.query('INSERT INTO member (email, password_hash, name, phone, phone_verified, point_balance) VALUES (?, NULL, ?, ?, ?, ?)',
-          [email, prof.name.slice(0, 50), prof.phone, verified, bonus]);
-        if (bonus) await conn.query('INSERT INTO point_ledger (member_id, delta, reason) VALUES (?, ?, ?)', [ins.insertId, bonus, '가입 보너스']);
-        m = { member_id: ins.insertId, email, name: prof.name, point_balance: bonus, phone_verified: verified };
-      }
-      await conn.query('INSERT INTO member_social (provider, provider_user_id, member_id) VALUES (?, ?, ?)', [name, prof.id, m.member_id]);
-    }
-    await conn.commit();
-    res.redirect(`/#social=${sign({ t: 'k', m: m.member_id, exp: Date.now() + 2 * 60e3 })}`); // 2분짜리 티켓 (주소의 # 뒤에 담겨 서버 기록에 남지 않는다)
-  } catch (e) {
-    await conn.rollback();
-    console.error(e);
-    fail('가입 처리 중 문제가 생겼어요.');
-  } finally {
-    conn.release();
-  }
-}));
-
-app.post('/api/auth/exchange', wrap(async (req, res) => { // 소셜 로그인 뒤 받은 1회용 티켓을 로그인 토큰으로 바꾼다
-  const t = unsign(String((req.body && req.body.ticket) || ''), 'k');
-  if (!t) return res.status(400).json({ error: '로그인 요청이 만료됐어요.' });
-  const [[m]] = await pool.query('SELECT member_id, email, name, point_balance, phone_verified FROM member WHERE member_id = ?', [t.m]);
-  if (!m) return res.status(400).json({ error: '로그인 요청이 만료됐어요.' });
-  res.json({ token: newSession(m), ...publicMember(m) });
-}));
-
 // ---- 카페 목록 (시·구 평균 대비) ------------------------------------------
 // 좌석 유형별 시간당 요금을 같은 시·구 평균과 비교한다.
 // 평균은 사람이 확인한 요금(VERIFIED)만으로 계산한다. 예시 요금(EXAMPLE)인 카페는 목록에는 나오되 평균 비교(diff)는 null 이다.
@@ -450,14 +277,11 @@ app.get('/api/cafes/:id(\\d+)', wrap(async (req, res) => {
   const [facilities] = await pool.query(
     `SELECT f.code, f.name FROM cafe_facility cf JOIN facility f ON f.facility_id = cf.facility_id
      WHERE cf.cafe_id = ? ORDER BY f.facility_id`, [id]);
-  const [nearby] = await pool.query(
-    `SELECT l.kind, l.name, cl.distance_m FROM cafe_landmark cl JOIN landmark l ON l.landmark_id = cl.landmark_id
-     WHERE cl.cafe_id = ? ORDER BY cl.distance_m`, [id]);
   const [reviews] = await pool.query(
     `SELECT rv.rating, rv.content, rv.created_at, m.name AS member_name
      FROM review rv JOIN member m ON m.member_id = rv.member_id
      WHERE rv.cafe_id = ? ORDER BY rv.created_at DESC LIMIT 20`, [id]);
-  res.json({ cafe, seats, plans, comparison, facilities, nearby, reviews });
+  res.json({ cafe, seats, plans, comparison, facilities, reviews });
 }));
 
 // ---- 화면이 보는 카페를 DB 에 등록 (처음 예약·찜할 때) ----------------------------------
