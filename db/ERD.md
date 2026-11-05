@@ -1,8 +1,8 @@
-# 스터디모아 ERD (v3)
+# 스터디모아 ERD (v4)
 
-작성일 2026-11-02 · 대상: 현재 사이트(`public/app.js`)와 서버(`server/index.js`) 기능 전체 · DBMS: MySQL 8 (InnoDB)
+작성일 2026-11-02, 개정 2026-11-05 · 대상: 현재 사이트(`public/app.js`)와 서버(`server/index.js`) 기능 전체 · DBMS: MySQL 8 (InnoDB)
 
-테이블 18개 + 뷰 1개. 실제 DB(`db/schema.sql`)와 같은 구조이며, 제약 규칙(이중 예약 차단, 중복 가입 차단, 요금 출처 규칙)은 DB에서 직접 검증했다.
+테이블 15개 + 뷰 1개. 실제 DB(`db/schema.sql`)와 같은 구조(컬럼 92개를 스키마·운영 DB와 전수 대조)이며, 제약 규칙(이중 예약 차단, 중복 가입 차단, 요금 출처 규칙)은 DB에서 직접 검증했다.
 
 ## ER 다이어그램
 
@@ -12,17 +12,13 @@ erDiagram
   MEMBER ||--o{ REVIEW : "작성한다"
   MEMBER ||--o{ FAVORITE : "찜한다"
   MEMBER ||--o{ POINT_LEDGER : "적립·사용"
-  MEMBER ||--o{ MEMBER_SOCIAL : "소셜 연결"
   REGION ||--o{ CAFE : "속한다"
-  REGION ||--o{ LANDMARK : "속한다"
   CAFE ||--o{ SEAT : "보유한다"
   CAFE ||--o{ PRICE_PLAN : "요금제를 가진다"
   CAFE ||--o{ REVIEW : "받는다"
   CAFE ||--o{ FAVORITE : "찜 받는다"
   CAFE ||--o{ CAFE_FACILITY : "갖춘다"
-  CAFE ||--o{ CAFE_LANDMARK : "가깝다"
   FACILITY ||--o{ CAFE_FACILITY : ""
-  LANDMARK ||--o{ CAFE_LANDMARK : ""
   SEAT_TYPE ||--o{ SEAT : "분류한다"
   SEAT_TYPE ||--o{ PRICE_PLAN : "적용된다"
   SEAT ||--o{ RESERVATION : "예약된다"
@@ -35,18 +31,12 @@ erDiagram
   MEMBER {
     bigint member_id PK
     varchar email UK
-    varchar password_hash "소셜 전용 가입은 NULL"
+    varchar password_hash
     varchar name
     varchar phone UK "숫자만 저장"
     boolean phone_verified
     int point_balance
     datetime created_at
-  }
-  MEMBER_SOCIAL {
-    enum provider PK "KAKAO NAVER"
-    varchar provider_user_id PK
-    bigint member_id FK
-    datetime linked_at
   }
   PHONE_VERIFICATION {
     bigint verify_id PK
@@ -160,19 +150,6 @@ erDiagram
     bigint cafe_id PK, FK
     datetime created_at
   }
-  LANDMARK {
-    bigint landmark_id PK
-    bigint region_id FK
-    enum kind "STATION UNIVERSITY"
-    varchar name
-    decimal latitude
-    decimal longitude
-  }
-  CAFE_LANDMARK {
-    bigint cafe_id PK, FK
-    bigint landmark_id PK, FK
-    int distance_m
-  }
 ```
 
 ## 업무 영역 ↔ 테이블 (업무 영역 분할도와 연결)
@@ -180,10 +157,10 @@ erDiagram
 | 업무 영역 | 사이트 기능 | 주 테이블 |
 |---|---|---|
 | 이용 옵션 선택 | 시간제/기간제, 좌석 유형, 인원, 시설 필터 | SEAT_TYPE, SEAT, PRICE_PLAN, FACILITY, CAFE_FACILITY |
-| 지역 설정 | 시·도·구 선택, 현재 위치, 역·대학 거리 | REGION, CAFE, LANDMARK, CAFE_LANDMARK |
+| 지역 설정 | 시·도·구 선택, 현재 위치, 역·대학 근처(카카오 검색으로 화면에서 계산, DB에 저장하지 않음) | REGION, CAFE |
 | 비교 및 추천 | 구 평균 대비 요금, 후기, 찜 | PRICE_PLAN, REVIEW, FAVORITE, 뷰 `v_cafe_price_vs_region` |
 | 고객 예약 | 좌석 선택, 결제, 변경·취소·환불, 내 예약, 포인트 | MEMBER, RESERVATION, RESERVATION_SLOT, PAYMENT, POINT_LEDGER |
-| 회원 관리 | 가입(휴대폰 인증·중복 차단), 로그인, 카카오·네이버 연결 | MEMBER, MEMBER_SOCIAL, PHONE_VERIFICATION |
+| 회원 관리 | 가입(휴대폰 인증·중복 차단), 로그인 | MEMBER, PHONE_VERIFICATION |
 
 ## 핵심 설계 결정
 
@@ -191,9 +168,9 @@ erDiagram
 2. **실제 요금과 예시 요금을 섞지 않는다.** `PRICE_PLAN.price_source`가 `EXAMPLE`이면 화면에 "예시"로 표시하고, 팀이 조사해 넣은 값만 `VERIFIED`(+출처 `source_note`, 확인일 `verified_at`)로 올린다. `VERIFIED`인데 출처·확인일이 없으면 CHECK 규칙이 막는다. 구 평균 비교 뷰는 `VERIFIED`만으로 계산한다.
 3. **카카오에서 가져온 정보에는 출처 시각을 남긴다.** `CAFE.info_source`, `fetched_at`, `kakao_place_id`(중복 방지 UK), `place_url`. 카카오는 요금·좌석·시설·사진을 주지 않으므로 이 값들은 별도 테이블에 둔다.
 4. **좌석을 낱개로 둔다.** 사이트가 "일반석 12번"처럼 번호별로 고르게 하므로 `SEAT` 한 행이 좌석 하나다. 유형은 `SEAT_TYPE`(일반석·집중석·스터디룸)으로 분리해 `PRICE_PLAN`과 같은 기준으로 연결한다.
-5. **N:M은 연결 테이블로 푼다.** 카페-시설(`CAFE_FACILITY`), 회원-카페 찜(`FAVORITE`), 카페-역·대학(`CAFE_LANDMARK`, 거리 포함).
+5. **N:M은 연결 테이블로 푼다.** 카페-시설(`CAFE_FACILITY`), 회원-카페 찜(`FAVORITE`).
 6. **포인트는 잔액 + 원장.** `MEMBER.point_balance`는 조회용 값이고, 변동 이력은 `POINT_LEDGER`에 쌓는다. 포인트 결제는 `PAYMENT.method = POINT`와 원장 `-` 행이 한 쌍이다. 잔액은 0 미만이 될 수 없다(CHECK).
-7. **중복 가입을 DB에서 막는다.** 이메일(`uq_member_email`)과 휴대폰 번호(`uq_member_phone`)가 각각 유일하고, 같은 소셜 계정은 `MEMBER_SOCIAL`의 기본키 `(provider, provider_user_id)` 때문에 한 회원에만 연결된다. 서버는 이메일을 소문자로 정리하고 번호는 숫자만 저장해 표기 차이로 우회하지 못하게 한다.
+7. **중복 가입을 DB에서 막는다.** 이메일(`uq_member_email`)과 휴대폰 번호(`uq_member_phone`)가 각각 유일하다. 서버는 이메일을 소문자로 정리하고 번호는 숫자만 저장해 표기 차이로 우회하지 못하게 한다.
 8. **휴대폰 인증은 코드를 해시로만 저장한다.** `PHONE_VERIFICATION`은 만료(5분)와 시도 횟수(5회)를 제한하고, 인증을 마친 번호만 15분 안에 가입할 수 있으며, 가입이 끝나면 인증 기록을 지워 재사용을 막는다. 실제 문자 발송 업체는 연결하지 않아 모의 모드로 동작한다.
 9. **환불은 결제에 기록한다.** 시간제는 이용 1시간 전까지 100%, 이후 50%, 기간제는 시작 전 100%이며 결제 행의 `refund_amount`에 남긴다. 포인트로 결제했다면 같은 금액을 포인트로 돌려준다.
 10. **카카오 카페는 처음 쓸 때 또는 가져오기로 저장한다.** 사이트는 지역을 고르면 카카오에서 불러오고, 예약 시점에 서버가 그 카페를 등록한다. 전국 6,142곳은 `npm run db:import`로 한 번에 넣었다.
@@ -202,16 +179,22 @@ erDiagram
 
 | 구분 | 내용 |
 |---|---|
-| 추가 | `FACILITY`, `CAFE_FACILITY`(시설 7종 필터), `SEAT_TYPE`, `POINT_LEDGER`, `LANDMARK`, `CAFE_LANDMARK`, `MEMBER_SOCIAL`, `PHONE_VERIFICATION` |
+| 추가 | `FACILITY`, `CAFE_FACILITY`(시설 7종 필터), `SEAT_TYPE`, `POINT_LEDGER`, `PHONE_VERIFICATION` |
 | 이름 변경 | `room` → `seat` (낱개 좌석과 룸을 모두 담으므로) |
 | 컬럼 추가 | `cafe.place_url·info_source·fetched_at·is_active`, `region.center_lat·center_lng`, `price_plan.price_source·source_note·verified_at`, `member.point_balance·phone_verified`, `reservation.updated_at`, `payment.refund_amount`, `payment.method`에 `KAKAO` |
-| 규칙 변경 | `member.password_hash`를 NULL 허용(소셜 전용 가입), `member.phone`을 유일(UNIQUE)로 |
+| 규칙 변경 | `member.phone`을 유일(UNIQUE)로 |
 | 유지 | `member`, `region`, `cafe`, `price_plan`, `reservation`, `reservation_slot`, `payment`, `review`, `favorite`, 뷰 |
 | 삭제 | 예약 상태 `PENDING` (사이트는 예약 즉시 `CONFIRMED`이므로 쓰지 않음) |
 
-## 아직 정해지지 않은 것 (팀 결정 필요)
+## v3 → v4 변경 (2026-11-05, 범위 정리)
 
-- **카카오·네이버 로그인.** 테이블과 서버 코드는 있으나, 카카오 콘솔 설정(Redirect URI)과 네이버 앱 키가 없어 실제 로그인은 검증하지 못했다.
+| 제거 | 이유 |
+|---|---|
+| 사장·관리자 구분 (`member.role`, `cafe.owner_id`, `info_source`의 OWNER) | 사장·관리자 기능이 없고 서버·화면이 쓰지 않음 |
+| 소셜 로그인 (`MEMBER_SOCIAL`) | 외부 설정이 없어 한 번도 쓰지 못했고 범위에서 제외 |
+| 역·대학 (`LANDMARK`, `CAFE_LANDMARK`) | 데이터가 없고 화면의 역세권·대학가 필터는 카카오 검색으로 직접 계산함 |
+
+## 아직 정해지지 않은 것 (팀 결정 필요)
 - **PASS 본인인증.** 통신사 본인확인기관 계약이 필요해 범위 밖이다. 휴대폰 인증은 모의 문자 인증으로 대신한다.
 
 ## 정해진 것 (이전 초안의 미정 사항)
