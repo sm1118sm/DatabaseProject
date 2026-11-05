@@ -13,7 +13,6 @@ erDiagram
   MEMBER ||--o{ FAVORITE : "찜한다"
   MEMBER ||--o{ POINT_LEDGER : "적립·사용"
   MEMBER ||--o{ MEMBER_SOCIAL : "소셜 연결"
-  MEMBER |o--o{ CAFE : "운영한다(사장)"
   REGION ||--o{ CAFE : "속한다"
   REGION ||--o{ LANDMARK : "속한다"
   CAFE ||--o{ SEAT : "보유한다"
@@ -40,7 +39,6 @@ erDiagram
     varchar name
     varchar phone UK "숫자만 저장"
     boolean phone_verified
-    enum role "USER OWNER ADMIN"
     int point_balance
     datetime created_at
   }
@@ -69,7 +67,6 @@ erDiagram
   CAFE {
     bigint cafe_id PK
     varchar kakao_place_id UK
-    bigint owner_id FK
     bigint region_id FK
     varchar name
     varchar address
@@ -79,7 +76,7 @@ erDiagram
     varchar place_url
     time open_time
     time close_time
-    enum info_source "KAKAO OWNER MANUAL"
+    enum info_source "KAKAO MANUAL"
     datetime fetched_at "카카오에서 가져온 시각"
     boolean is_active
     datetime created_at
@@ -214,7 +211,6 @@ erDiagram
 
 ## 아직 정해지지 않은 것 (팀 결정 필요)
 
-- **사장(`OWNER`) 기능을 범위에 넣을지.** 넣으면 사장이 요금·좌석을 직접 입력하는 화면이 필요하고, 실제 요금 확보 문제도 풀린다. 빼면 `OWNER`는 컬럼만 남는다.
 - **카카오·네이버 로그인.** 테이블과 서버 코드는 있으나, 카카오 콘솔 설정(Redirect URI)과 네이버 앱 키가 없어 실제 로그인은 검증하지 못했다.
 - **PASS 본인인증.** 통신사 본인확인기관 계약이 필요해 범위 밖이다. 휴대폰 인증은 모의 문자 인증으로 대신한다.
 

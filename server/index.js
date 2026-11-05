@@ -215,7 +215,7 @@ app.post('/api/login', limit('login', 40, 600e3), wrap(async (req, res) => {
 }));
 
 app.get('/api/me', auth, wrap(async (req, res) => {
-  const [[m]] = await pool.query('SELECT member_id, email, name, phone, phone_verified, role, point_balance FROM member WHERE member_id = ?', [req.member.memberId]);
+  const [[m]] = await pool.query('SELECT member_id, email, name, phone, phone_verified, point_balance FROM member WHERE member_id = ?', [req.member.memberId]);
   if (!m) return res.status(401).json({ error: '로그인이 필요합니다.' });
   const [points] = await pool.query(
     'SELECT delta, reason, created_at FROM point_ledger WHERE member_id = ? ORDER BY created_at DESC, point_id DESC LIMIT 20', [req.member.memberId]);
