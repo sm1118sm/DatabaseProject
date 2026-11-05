@@ -11,7 +11,7 @@ USE studycafe;
 CREATE TABLE member (
   member_id     BIGINT       NOT NULL AUTO_INCREMENT,
   email         VARCHAR(100) NOT NULL,
-  password_hash VARCHAR(255),                 -- 소셜 로그인으로만 가입한 회원은 NULL
+  password_hash VARCHAR(255),
   name          VARCHAR(50)  NOT NULL,
   phone         VARCHAR(20),                  -- 숫자만 저장(01012345678). 한 번호로 한 번만 가입
   phone_verified BOOLEAN     NOT NULL DEFAULT FALSE,

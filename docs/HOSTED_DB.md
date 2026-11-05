@@ -63,7 +63,7 @@ Vercel 프로젝트 Settings → Environment Variables (Production, Preview 모�
 | `DB_POOL` | `2` (서버 기능 인스턴스당 접속 수. Aiven 무료는 동시 접속 76개) |
 | `AUTH_SECRET` | 임의의 긴 문자열 (로그인 토큰 서명용. 바꾸면 모두 로그아웃된다) |
 
-선택: `KAKAO_REST_KEY`, `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`(소셜 로그인), `PUBLIC_BASE_URL`(사이트 주소).
+선택: `PUBLIC_BASE_URL`(사이트 주소).
 
 ## 알아둘 점
 

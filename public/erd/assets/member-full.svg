@@ -1,0 +1,686 @@
+<svg role="img" aria-label="회원·인증" width="1020pt" height="1926pt"
+ viewBox="0.00 0.00 1020.00 1926.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(32.4 1893.68)">
+<title>ERD</title>
+<polygon fill="white" stroke="none" points="-32.4,32.4 -32.4,-1893.68 987.88,-1893.68 987.88,32.4 -32.4,32.4"/>
+<!-- member&#45;&#45;a_member_0 -->
+<g id="edge1" class="edge">
+<title>member&#45;&#45;a_member_0</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M49.1,-975.68C56.26,-1054.31 86.33,-1346.66 142.8,-1417.14 150.19,-1426.36 161.27,-1432.65 172.03,-1436.89"/>
+</g>
+<!-- member&#45;&#45;a_member_1 -->
+<g id="edge2" class="edge">
+<title>member&#45;&#45;a_member_1</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M49.72,-975.7C58.63,-1048.03 92.72,-1299.38 142.8,-1360.14 151.37,-1370.54 164.61,-1377.22 176.66,-1381.45"/>
+</g>
+<!-- member&#45;&#45;a_member_2 -->
+<g id="edge3" class="edge">
+<title>member&#45;&#45;a_member_2</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M47.27,-975.66C47.91,-1033 57.32,-1203.19 142.8,-1303.14 148.48,-1309.79 156.07,-1314.93 163.97,-1318.88"/>
+</g>
+<!-- member&#45;&#45;a_member_3 -->
+<g id="edge4" class="edge">
+<title>member&#45;&#45;a_member_3</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M48.54,-975.72C52.51,-1026.64 69.8,-1164.95 142.8,-1246.14 153.23,-1257.74 169.4,-1264.82 182.61,-1268.96"/>
+</g>
+<!-- member&#45;&#45;a_member_4 -->
+<g id="edge5" class="edge">
+<title>member&#45;&#45;a_member_4</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M50.38,-975.68C58.01,-1019.41 82.09,-1126.24 142.8,-1189.14 149.69,-1196.28 158.74,-1201.75 167.79,-1205.88"/>
+</g>
+<!-- member&#45;&#45;a_member_5 -->
+<g id="edge6" class="edge">
+<title>member&#45;&#45;a_member_5</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M53.33,-975.68C65.01,-1011.21 94.18,-1086.94 142.8,-1132.14 149.12,-1138.01 156.88,-1142.81 164.74,-1146.68"/>
+</g>
+<!-- member&#45;&#45;a_member_6 -->
+<g id="edge7" class="edge">
+<title>member&#45;&#45;a_member_6</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M58.74,-975.37C74.69,-1001.05 105.97,-1046.59 142.8,-1075.14 151.11,-1081.58 161.14,-1086.93 170.69,-1091.17"/>
+</g>
+<!-- member&#45;&#45;a_member_7 -->
+<g id="edge8" class="edge">
+<title>member&#45;&#45;a_member_7</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M73.96,-974.46C92.79,-987.11 118.86,-1003.97 142.8,-1017.14 153.95,-1023.27 166.61,-1029.35 177.58,-1034.34"/>
+</g>
+<!-- member&#45;&#45;r1 -->
+<g id="edge45" class="edge">
+<title>member&#45;&#45;r1</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M73.75,-960.83C100.28,-965.54 141.32,-972.84 170.4,-978.02"/>
+<text xml:space="preserve" text-anchor="middle" x="87.66" y="-966.7" font-family="Malgun Gothic" font-size="13.00" fill="#334155">1</text>
+</g>
+<!-- member&#45;&#45;r6 -->
+<g id="edge47" class="edge">
+<title>member&#45;&#45;r6</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M73.83,-954.37C128.44,-950.72 254.95,-942.27 330.82,-937.2"/>
+<text xml:space="preserve" text-anchor="middle" x="89.68" y="-956.61" font-family="Malgun Gothic" font-size="13.00" fill="#334155">1</text>
+</g>
+<!-- member&#45;&#45;r8 -->
+<g id="edge51" class="edge">
+<title>member&#45;&#45;r8</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M73.83,-949.3C136.63,-933.06 294.48,-892.24 361.1,-875.01"/>
+<text xml:space="preserve" text-anchor="middle" x="90.55" y="-948.5" font-family="Malgun Gothic" font-size="13.00" fill="#334155">1</text>
+</g>
+<!-- member&#45;&#45;r16 -->
+<g id="edge57" class="edge">
+<title>member&#45;&#45;r16</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M61.93,-936.76C93.06,-895.23 165.65,-798.41 193.59,-761.14"/>
+<text xml:space="preserve" text-anchor="middle" x="76.92" y="-924.84" font-family="Malgun Gothic" font-size="13.00" fill="#334155">M</text>
+</g>
+<!-- phone&#45;&#45;a_phone_0 -->
+<g id="edge9" class="edge">
+<title>phone&#45;&#45;a_phone_0</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M55.85,-1692.29C69.96,-1722.29 100.91,-1780.63 142.8,-1816.14 150.73,-1822.86 160.54,-1828.27 170,-1832.48"/>
+</g>
+<!-- phone&#45;&#45;a_phone_1 -->
+<g id="edge10" class="edge">
+<title>phone&#45;&#45;a_phone_1</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M65.33,-1692.47C83.51,-1711.27 113.12,-1739.75 142.8,-1759.14 152.1,-1765.22 162.93,-1770.61 172.92,-1774.99"/>
+</g>
+<!-- phone&#45;&#45;a_phone_2 -->
+<g id="edge11" class="edge">
+<title>phone&#45;&#45;a_phone_2</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M93.36,-1689.78C117.41,-1698.49 146.43,-1708.99 168.83,-1717.1"/>
+</g>
+<!-- phone&#45;&#45;a_phone_3 -->
+<g id="edge12" class="edge">
+<title>phone&#45;&#45;a_phone_3</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M93.36,-1673.14C116.14,-1673.14 143.38,-1673.14 165.23,-1673.14"/>
+</g>
+<!-- phone&#45;&#45;a_phone_4 -->
+<g id="edge13" class="edge">
+<title>phone&#45;&#45;a_phone_4</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M93.36,-1656.5C119.86,-1646.91 152.4,-1635.13 175.46,-1626.78"/>
+</g>
+<!-- phone&#45;&#45;a_phone_5 -->
+<g id="edge14" class="edge">
+<title>phone&#45;&#45;a_phone_5</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M65.33,-1653.81C83.51,-1635.01 113.12,-1606.53 142.8,-1587.14 151.11,-1581.71 160.65,-1576.83 169.71,-1572.72"/>
+</g>
+<!-- phone&#45;&#45;a_phone_6 -->
+<g id="edge15" class="edge">
+<title>phone&#45;&#45;a_phone_6</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M55.85,-1654C69.96,-1623.99 100.91,-1565.65 142.8,-1530.14 151.9,-1522.42 163.48,-1516.44 174.16,-1512.02"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_0 -->
+<g id="edge16" class="edge">
+<title>cafe&#45;&#45;a_cafe_0</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M419.84,-613.76C452.56,-608.32 508.54,-599.02 544.89,-592.97"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_1 -->
+<g id="edge17" class="edge">
+<title>cafe&#45;&#45;a_cafe_1</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M420.16,-604.71C444.9,-592.33 482.83,-573.6 516.16,-558.14 525.6,-553.76 535.9,-549.17 545.41,-544.99"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_2 -->
+<g id="edge18" class="edge">
+<title>cafe&#45;&#45;a_cafe_2</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M410.09,-598.56C432.2,-573.38 473.54,-529.53 516.16,-501.14 529.35,-492.35 545.75,-485.23 558.62,-480.36"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_3 -->
+<g id="edge19" class="edge">
+<title>cafe&#45;&#45;a_cafe_3</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M402.79,-598.55C420.35,-563.29 461.64,-488.69 516.16,-444.14 528.52,-434.03 545.11,-426.91 558.27,-422.37"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_4 -->
+<g id="edge20" class="edge">
+<title>cafe&#45;&#45;a_cafe_4</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M399,-598.68C412.18,-555.16 449.59,-448.91 516.16,-387.14 524.58,-379.32 535.54,-373.45 546,-369.16"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_5 -->
+<g id="edge21" class="edge">
+<title>cafe&#45;&#45;a_cafe_5</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M396.71,-598.58C405.99,-547.72 437.43,-409.73 516.16,-330.14 527.47,-318.7 544.26,-311.59 557.77,-307.4"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_6 -->
+<g id="edge22" class="edge">
+<title>cafe&#45;&#45;a_cafe_6</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M395.12,-598.6C400.83,-541.22 425,-371.1 516.16,-273.14 527.12,-261.36 543.92,-254.26 557.53,-250.16"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_7 -->
+<g id="edge23" class="edge">
+<title>cafe&#45;&#45;a_cafe_7</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M393.96,-598.65C396.41,-535.35 412.41,-332.84 516.16,-216.14 522.99,-208.45 532.32,-202.79 541.74,-198.64"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_8 -->
+<g id="edge24" class="edge">
+<title>cafe&#45;&#45;a_cafe_8</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M393.07,-598.88C392.52,-530.33 399.59,-294.97 516.16,-159.14 524.12,-149.87 535.73,-143.55 546.87,-139.31"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_9 -->
+<g id="edge25" class="edge">
+<title>cafe&#45;&#45;a_cafe_9</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M395.83,-598.56C406.14,-514.01 450.38,-180.97 516.16,-102.14 523.99,-92.76 535.57,-86.42 546.73,-82.18"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_10 -->
+<g id="edge26" class="edge">
+<title>cafe&#45;&#45;a_cafe_10</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M395.32,-598.57C403.99,-508.42 443.91,-133.74 516.16,-45.14 523.57,-36.04 534.53,-29.82 545.29,-25.6"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_11 -->
+<g id="edge27" class="edge">
+<title>cafe&#45;&#45;a_cafe_11</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M410.26,-637.6C425.58,-655.8 448.48,-684.02 466.16,-710.14 491.15,-747.07 482.96,-767.36 516.16,-797.14 524.71,-804.82 535.71,-810.65 546.15,-814.95"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_12 -->
+<g id="edge28" class="edge">
+<title>cafe&#45;&#45;a_cafe_12</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M409.16,-637.72C430.89,-663.87 472.48,-710.38 516.16,-740.14 526.16,-746.95 538.08,-752.72 548.9,-757.21"/>
+</g>
+<!-- cafe&#45;&#45;a_cafe_13 -->
+<g id="edge29" class="edge">
+<title>cafe&#45;&#45;a_cafe_13</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M420.1,-632.55C444.8,-645.8 482.7,-665.82 516.16,-682.14 528.08,-687.95 541.42,-694.08 552.81,-699.19"/>
+</g>
+<!-- cafe&#45;&#45;r9 -->
+<g id="edge53" class="edge">
+<title>cafe&#45;&#45;r9</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M419.84,-622.52C454.37,-628.26 514.79,-638.3 550.72,-644.28"/>
+<text xml:space="preserve" text-anchor="middle" x="433.86" y="-628.23" font-family="Malgun Gothic" font-size="13.00" fill="#334155">1</text>
+</g>
+<!-- reservation&#45;&#45;a_reservation_0 -->
+<g id="edge30" class="edge">
+<title>reservation&#45;&#45;a_reservation_0</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M419.84,-1107.19C453.77,-1117.56 512.69,-1135.57 548.82,-1146.62"/>
+</g>
+<!-- reservation&#45;&#45;a_reservation_1 -->
+<g id="edge31" class="edge">
+<title>reservation&#45;&#45;a_reservation_1</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M419.84,-1099.14C451.96,-1099.14 506.48,-1099.14 542.86,-1099.14"/>
+</g>
+<!-- reservation&#45;&#45;a_reservation_2 -->
+<g id="edge32" class="edge">
+<title>reservation&#45;&#45;a_reservation_2</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M419.84,-1091.09C453.77,-1080.72 512.69,-1062.71 548.82,-1051.67"/>
+</g>
+<!-- reservation&#45;&#45;a_reservation_3 -->
+<g id="edge33" class="edge">
+<title>reservation&#45;&#45;a_reservation_3</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M395.65,-1118.68C402.63,-1173.72 429.59,-1331.99 516.16,-1423.14 527.24,-1434.81 544.03,-1441.91 557.61,-1446.04"/>
+</g>
+<!-- reservation&#45;&#45;a_reservation_4 -->
+<g id="edge34" class="edge">
+<title>reservation&#45;&#45;a_reservation_4</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M397.46,-1118.68C408.13,-1166.96 441.95,-1293.19 516.16,-1366.14 524.61,-1374.45 535.95,-1380.5 546.72,-1384.81"/>
+</g>
+<!-- reservation&#45;&#45;a_reservation_5 -->
+<g id="edge35" class="edge">
+<title>reservation&#45;&#45;a_reservation_5</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M400.16,-1118.64C414.91,-1159.28 454.06,-1253.81 516.16,-1309.14 525.37,-1317.35 537.37,-1323.46 548.48,-1327.85"/>
+</g>
+<!-- reservation&#45;&#45;a_reservation_6 -->
+<g id="edge36" class="edge">
+<title>reservation&#45;&#45;a_reservation_6</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M404.99,-1118.61C424.38,-1150.11 466.44,-1212.62 516.16,-1251.14 526.16,-1258.89 538.57,-1265.13 549.78,-1269.81"/>
+</g>
+<!-- reservation&#45;&#45;r7 -->
+<g id="edge49" class="edge">
+<title>reservation&#45;&#45;r7</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M419.15,-1118.64C443.5,-1136.79 481.45,-1164.13 516.16,-1185.14 528.32,-1192.5 542.31,-1199.85 554.08,-1205.74"/>
+<text xml:space="preserve" text-anchor="middle" x="427.25" y="-1129.69" font-family="Malgun Gothic" font-size="13.00" fill="#334155">1</text>
+</g>
+<!-- reservation&#45;&#45;r10 -->
+<g id="edge55" class="edge">
+<title>reservation&#45;&#45;r10</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M419.15,-1079.64C443.5,-1061.49 481.45,-1034.15 516.16,-1013.14 528.32,-1005.78 542.31,-998.43 554.08,-992.54"/>
+<text xml:space="preserve" text-anchor="middle" x="435.81" y="-1072.34" font-family="Malgun Gothic" font-size="13.00" fill="#334155">1</text>
+</g>
+<!-- point&#45;&#45;a_point_0 -->
+<g id="edge37" class="edge">
+<title>point&#45;&#45;a_point_0</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M773.71,-1194.68C792.23,-1206.29 816.48,-1221.06 838.6,-1233.14 846.87,-1237.66 855.99,-1242.27 864.47,-1246.4"/>
+</g>
+<!-- point&#45;&#45;a_point_1 -->
+<g id="edge38" class="edge">
+<title>point&#45;&#45;a_point_1</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M789.06,-1183.84C814.56,-1188.68 845.49,-1194.55 867.52,-1198.73"/>
+</g>
+<!-- point&#45;&#45;a_point_2 -->
+<g id="edge39" class="edge">
+<title>point&#45;&#45;a_point_2</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M789.06,-1166.74C816.84,-1161.65 851.08,-1155.38 873.23,-1151.32"/>
+</g>
+<!-- point&#45;&#45;a_point_3 -->
+<g id="edge40" class="edge">
+<title>point&#45;&#45;a_point_3</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M774.18,-1155.72C792.66,-1144.37 816.71,-1129.99 838.6,-1118.14 848.55,-1112.75 859.69,-1107.22 869.49,-1102.5"/>
+</g>
+<!-- review&#45;&#45;a_review_0 -->
+<g id="edge41" class="edge">
+<title>review&#45;&#45;a_review_0</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M769.58,-893.73C788.54,-905.44 814.84,-921.28 838.6,-934.14 848.55,-939.53 859.69,-945.07 869.49,-949.78"/>
+</g>
+<!-- review&#45;&#45;a_review_1 -->
+<g id="edge42" class="edge">
+<title>review&#45;&#45;a_review_1</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M769.82,-882.02C799.07,-887.38 845.56,-895.89 873.21,-900.96"/>
+</g>
+<!-- review&#45;&#45;a_review_2 -->
+<g id="edge43" class="edge">
+<title>review&#45;&#45;a_review_2</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M769.82,-872.09C797.87,-866.77 841.78,-858.43 869.72,-853.13"/>
+</g>
+<!-- review&#45;&#45;a_review_3 -->
+<g id="edge44" class="edge">
+<title>review&#45;&#45;a_review_3</title>
+<path fill="none" stroke="#b1bac6" stroke-width="0.85" d="M769.54,-860.22C788.48,-848.27 814.78,-832.15 838.6,-819.14 848.53,-813.72 859.67,-808.17 869.47,-803.46"/>
+</g>
+<!-- r1&#45;&#45;reservation -->
+<g id="edge46" class="edge">
+<title>r1&#45;&#45;reservation</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M230,-994.63C241.89,-1000.76 256.58,-1008.62 269.39,-1016.28 303.51,-1036.69 341.28,-1062.46 365.79,-1079.62"/>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M229.08,-996.41C240.94,-1002.53 255.63,-1010.38 268.36,-1018 302.38,-1038.35 340.15,-1064.11 364.65,-1081.26"/>
+<text xml:space="preserve" text-anchor="middle" x="356.69" y="-1061.83" font-family="Malgun Gothic" font-size="13.00" fill="#334155">N</text>
+</g>
+<!-- r6&#45;&#45;point -->
+<g id="edge48" class="edge">
+<title>r6&#45;&#45;point</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M433.82,-922.27C487.58,-911.63 582.81,-901.73 646.38,-946.32 717.58,-996.99 736.05,-1110.03 740.7,-1155.56"/>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M434.21,-924.23C487.79,-913.62 583.02,-903.72 645.22,-947.96 715.61,-997.31 734.08,-1110.36 738.71,-1155.76"/>
+<text xml:space="preserve" text-anchor="middle" x="745.02" y="-1135.61" font-family="Malgun Gothic" font-size="13.00" fill="#334155">N</text>
+</g>
+<!-- r7&#45;&#45;point -->
+<g id="edge50" class="edge">
+<title>r7&#45;&#45;point</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M616.53,-1208.81C639.57,-1202.59 670.14,-1194.33 695.23,-1187.55"/>
+<text xml:space="preserve" text-anchor="middle" x="678.48" y="-1180.74" font-family="Malgun Gothic" font-size="13.00" fill="#334155">N</text>
+</g>
+<!-- r8&#45;&#45;review -->
+<g id="edge52" class="edge">
+<title>r8&#45;&#45;review</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M438.64,-867.44C512.14,-869.55 655.48,-873.67 714.67,-875.38"/>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M438.59,-869.44C512.08,-871.55 655.42,-875.67 714.62,-877.38"/>
+<text xml:space="preserve" text-anchor="middle" x="699.45" y="-864.85" font-family="Malgun Gothic" font-size="13.00" fill="#334155">N</text>
+</g>
+<!-- r9&#45;&#45;review -->
+<g id="edge54" class="edge">
+<title>r9&#45;&#45;review</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M606.21,-656.28C619.39,-661.72 635.18,-669.93 646.51,-681.44 697.87,-734.09 726.3,-819.13 737.08,-857.29"/>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M605.44,-658.13C618.47,-663.49 634.26,-671.7 645.08,-682.84 695.97,-734.73 724.4,-819.76 735.16,-857.84"/>
+<text xml:space="preserve" text-anchor="middle" x="738.65" y="-836.85" font-family="Malgun Gothic" font-size="13.00" fill="#334155">N</text>
+</g>
+<!-- r10&#45;&#45;review -->
+<g id="edge56" class="edge">
+<title>r10&#45;&#45;review</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M603.45,-966.25C632.31,-947.58 683.59,-914.41 714.78,-894.23"/>
+<text xml:space="preserve" text-anchor="middle" x="697.94" y="-892.67" font-family="Malgun Gothic" font-size="13.00" fill="#334155">1</text>
+</g>
+<!-- r16&#45;&#45;cafe -->
+<g id="edge58" class="edge">
+<title>r16&#45;&#45;cafe</title>
+<path fill="none" stroke="#64748b" stroke-width="1.05" d="M223.88,-734.33C256.21,-711.92 326.62,-663.12 365.11,-636.45"/>
+<text xml:space="preserve" text-anchor="middle" x="348.35" y="-635.42" font-family="Malgun Gothic" font-size="13.00" fill="#334155">N</text>
+</g>
+<!-- r16&#45;&#45;attr_r16 -->
+<g id="edge59" class="edge">
+<title>r16&#45;&#45;attr_r16</title>
+<path fill="none" stroke="#b1bac6" stroke-width="1.05" d="M244.66,-746.14C272.73,-746.14 311.27,-746.14 341.83,-746.14"/>
+</g>
+<!-- member -->
+<g id="entity_member" class="node">
+<title>member</title>
+<g id="a_entity_member"><a xlink:title="MEMBER">
+<polygon fill="#edf4ff" stroke="#1d4d83" stroke-width="1.3" points="73.4,-975.1 19.4,-975.1 19.4,-937.18 73.4,-937.18 73.4,-975.1"/>
+<text xml:space="preserve" text-anchor="middle" x="46.4" y="-951.34" font-family="Malgun Gothic" font-size="16.00" fill="#173450">회원</text>
+</a>
+</g>
+</g>
+<!-- a_member_0 -->
+<g id="a_member_0" class="node">
+<title>a_member_0</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1445.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="start" x="186.34" y="-1442.24" font-family="Malgun Gothic" text-decoration="underline" font-size="13.00" fill="#334155">회원번호</text>
+</g>
+<!-- a_member_1 -->
+<g id="a_member_1" class="node">
+<title>a_member_1</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1388.14" rx="30.87" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-1384.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">이메일</text>
+</g>
+<!-- a_member_2 -->
+<g id="a_member_2" class="node">
+<title>a_member_2</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1331.14" rx="57.93" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-1327.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">비밀번호 해시?</text>
+</g>
+<!-- a_member_3 -->
+<g id="a_member_3" class="node">
+<title>a_member_3</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1274.14" rx="23.97" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-1270.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">이름</text>
+</g>
+<!-- a_member_4 -->
+<g id="a_member_4" class="node">
+<title>a_member_4</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1217.14" rx="48.73" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-1213.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">휴대폰번호?</text>
+</g>
+<!-- a_member_5 -->
+<g id="a_member_5" class="node">
+<title>a_member_5</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1160.14" rx="63.04" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-1156.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">휴대폰 인증 여부</text>
+</g>
+<!-- a_member_6 -->
+<g id="a_member_6" class="node">
+<title>a_member_6</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" stroke-dasharray="5,2" cx="205.84" cy="-1103.14" rx="46.95" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-1099.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">포인트 잔액</text>
+</g>
+<!-- a_member_7 -->
+<g id="a_member_7" class="node">
+<title>a_member_7</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1046.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-1042.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">가입일시</text>
+</g>
+<!-- phone -->
+<g id="entity_phone" class="node">
+<title>phone</title>
+<g id="a_entity_phone"><a xlink:title="PHONE_VERIFICATION">
+<polygon fill="#edf4ff" stroke="#1d4d83" stroke-width="1.3" points="92.8,-1692.1 0,-1692.1 0,-1654.18 92.8,-1654.18 92.8,-1692.1"/>
+<text xml:space="preserve" text-anchor="middle" x="46.4" y="-1668.34" font-family="Malgun Gothic" font-size="16.00" fill="#173450">휴대폰 인증</text>
+</a>
+</g>
+</g>
+<!-- a_phone_0 -->
+<g id="a_phone_0" class="node">
+<title>a_phone_0</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1844.14" rx="47.46" ry="17.14"/>
+<text xml:space="preserve" text-anchor="start" x="179.48" y="-1841.24" font-family="Malgun Gothic" text-decoration="underline" font-size="13.00" fill="#334155">인증번호ID</text>
+</g>
+<!-- a_phone_1 -->
+<g id="a_phone_1" class="node">
+<title>a_phone_1</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1787.14" rx="44.65" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-1783.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">휴대폰번호</text>
+</g>
+<!-- a_phone_2 -->
+<g id="a_phone_2" class="node">
+<title>a_phone_2</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1730.14" rx="53.85" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-1726.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">인증코드 해시</text>
+</g>
+<!-- a_phone_3 -->
+<g id="a_phone_3" class="node">
+<title>a_phone_3</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1673.14" rx="40.06" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-1669.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">시도 횟수</text>
+</g>
+<!-- a_phone_4 -->
+<g id="a_phone_4" class="node">
+<title>a_phone_4</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1616.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-1612.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">만료일시</text>
+</g>
+<!-- a_phone_5 -->
+<g id="a_phone_5" class="node">
+<title>a_phone_5</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1559.14" rx="55.63" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-1555.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">인증완료일시?</text>
+</g>
+<!-- a_phone_6 -->
+<g id="a_phone_6" class="node">
+<title>a_phone_6</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="205.84" cy="-1502.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-1498.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">생성일시</text>
+</g>
+<!-- cafe -->
+<g id="entity_cafe" class="node">
+<title>cafe</title>
+<g id="a_entity_cafe"><a xlink:title="CAFE">
+<polygon fill="#edf4ff" stroke="#1d4d83" stroke-width="1.3" points="419.52,-637.1 365.52,-637.1 365.52,-599.18 419.52,-599.18 419.52,-637.1"/>
+<text xml:space="preserve" text-anchor="middle" x="392.52" y="-613.34" font-family="Malgun Gothic" font-size="16.00" fill="#173450">카페</text>
+</a>
+</g>
+</g>
+<!-- a_cafe_0 -->
+<g id="a_cafe_0" class="node">
+<title>a_cafe_0</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-587.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="start" x="561.48" y="-584.24" font-family="Malgun Gothic" text-decoration="underline" font-size="13.00" fill="#334155">카페번호</text>
+</g>
+<!-- a_cafe_1 -->
+<g id="a_cafe_1" class="node">
+<title>a_cafe_1</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-530.14" rx="64.82" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-526.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">카카오 장소번호?</text>
+</g>
+<!-- a_cafe_2 -->
+<g id="a_cafe_2" class="node">
+<title>a_cafe_2</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-473.14" rx="23.97" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-469.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">이름</text>
+</g>
+<!-- a_cafe_3 -->
+<g id="a_cafe_3" class="node">
+<title>a_cafe_3</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-416.14" rx="23.97" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-412.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">주소</text>
+</g>
+<!-- a_cafe_4 -->
+<g id="a_cafe_4" class="node">
+<title>a_cafe_4</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-359.14" rx="41.84" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-355.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">전화번호?</text>
+</g>
+<!-- a_cafe_5 -->
+<g id="a_cafe_5" class="node">
+<title>a_cafe_5</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-302.14" rx="23.97" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-298.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">위도</text>
+</g>
+<!-- a_cafe_6 -->
+<g id="a_cafe_6" class="node">
+<title>a_cafe_6</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-245.14" rx="23.97" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-241.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">경도</text>
+</g>
+<!-- a_cafe_7 -->
+<g id="a_cafe_7" class="node">
+<title>a_cafe_7</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-188.14" rx="48.73" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-184.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">장소 URL?</text>
+</g>
+<!-- a_cafe_8 -->
+<g id="a_cafe_8" class="node">
+<title>a_cafe_8</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-131.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-127.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">개점시간</text>
+</g>
+<!-- a_cafe_9 -->
+<g id="a_cafe_9" class="node">
+<title>a_cafe_9</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-74.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-70.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">폐점시간</text>
+</g>
+<!-- a_cafe_10 -->
+<g id="a_cafe_10" class="node">
+<title>a_cafe_10</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-17.14" rx="40.06" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-13.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">정보 출처</text>
+</g>
+<!-- a_cafe_11 -->
+<g id="a_cafe_11" class="node">
+<title>a_cafe_11</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-825.14" rx="41.84" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-821.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">수집일시?</text>
+</g>
+<!-- a_cafe_12 -->
+<g id="a_cafe_12" class="node">
+<title>a_cafe_12</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-768.14" rx="40.06" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-764.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">활성 여부</text>
+</g>
+<!-- a_cafe_13 -->
+<g id="a_cafe_13" class="node">
+<title>a_cafe_13</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-711.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-707.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">생성일시</text>
+</g>
+<!-- reservation -->
+<g id="entity_reservation" class="node">
+<title>reservation</title>
+<g id="a_entity_reservation"><a xlink:title="RESERVATION">
+<polygon fill="#edf4ff" stroke="#1d4d83" stroke-width="1.3" points="419.52,-1118.1 365.52,-1118.1 365.52,-1080.18 419.52,-1080.18 419.52,-1118.1"/>
+<text xml:space="preserve" text-anchor="middle" x="392.52" y="-1094.34" font-family="Malgun Gothic" font-size="16.00" fill="#173450">예약</text>
+</a>
+</g>
+</g>
+<!-- a_reservation_0 -->
+<g id="a_reservation_0" class="node">
+<title>a_reservation_0</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-1156.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="start" x="561.48" y="-1153.24" font-family="Malgun Gothic" text-decoration="underline" font-size="13.00" fill="#334155">예약번호</text>
+</g>
+<!-- a_reservation_1 -->
+<g id="a_reservation_1" class="node">
+<title>a_reservation_1</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-1099.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-1095.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">시작일시</text>
+</g>
+<!-- a_reservation_2 -->
+<g id="a_reservation_2" class="node">
+<title>a_reservation_2</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-1042.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-1038.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">종료일시</text>
+</g>
+<!-- a_reservation_3 -->
+<g id="a_reservation_3" class="node">
+<title>a_reservation_3</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-1451.14" rx="23.97" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-1447.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">상태</text>
+</g>
+<!-- a_reservation_4 -->
+<g id="a_reservation_4" class="node">
+<title>a_reservation_4</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-1394.14" rx="40.06" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-1390.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">확정 금액</text>
+</g>
+<!-- a_reservation_5 -->
+<g id="a_reservation_5" class="node">
+<title>a_reservation_5</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-1337.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-1333.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">생성일시</text>
+</g>
+<!-- a_reservation_6 -->
+<g id="a_reservation_6" class="node">
+<title>a_reservation_6</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="580.98" cy="-1280.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-1276.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">수정일시</text>
+</g>
+<!-- point -->
+<g id="entity_point" class="node">
+<title>point</title>
+<g id="a_entity_point"><a xlink:title="POINT_LEDGER">
+<polygon fill="#edf4ff" stroke="#1d4d83" stroke-width="1.3" points="788.6,-1194.1 695.8,-1194.1 695.8,-1156.18 788.6,-1156.18 788.6,-1194.1"/>
+<text xml:space="preserve" text-anchor="middle" x="742.2" y="-1170.34" font-family="Malgun Gothic" font-size="16.00" fill="#173450">포인트 원장</text>
+</a>
+</g>
+</g>
+<!-- a_point_0 -->
+<g id="a_point_0" class="node">
+<title>a_point_0</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="897.04" cy="-1261.14" rx="58.44" ry="17.14"/>
+<text xml:space="preserve" text-anchor="start" x="862.92" y="-1258.24" font-family="Malgun Gothic" text-decoration="underline" font-size="13.00" fill="#334155">포인트내역번호</text>
+</g>
+<!-- a_point_1 -->
+<g id="a_point_1" class="node">
+<title>a_point_1</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="897.04" cy="-1204.14" rx="30.87" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="897.04" y="-1200.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">변동액</text>
+</g>
+<!-- a_point_2 -->
+<g id="a_point_2" class="node">
+<title>a_point_2</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="897.04" cy="-1147.14" rx="23.97" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="897.04" y="-1143.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">사유</text>
+</g>
+<!-- a_point_3 -->
+<g id="a_point_3" class="node">
+<title>a_point_3</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="897.04" cy="-1090.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="897.04" y="-1086.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">생성일시</text>
+</g>
+<!-- review -->
+<g id="entity_review" class="node">
+<title>review</title>
+<g id="a_entity_review"><a xlink:title="REVIEW">
+<polygon fill="#edf4ff" stroke="#1d4d83" stroke-width="1.3" points="769.2,-896.1 715.2,-896.1 715.2,-858.18 769.2,-858.18 769.2,-896.1"/>
+<text xml:space="preserve" text-anchor="middle" x="742.2" y="-872.34" font-family="Malgun Gothic" font-size="16.00" fill="#173450">후기</text>
+</a>
+</g>
+</g>
+<!-- a_review_0 -->
+<g id="a_review_0" class="node">
+<title>a_review_0</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="897.04" cy="-962.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="start" x="877.54" y="-959.24" font-family="Malgun Gothic" text-decoration="underline" font-size="13.00" fill="#334155">후기번호</text>
+</g>
+<!-- a_review_1 -->
+<g id="a_review_1" class="node">
+<title>a_review_1</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="897.04" cy="-905.14" rx="23.97" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="897.04" y="-901.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">평점</text>
+</g>
+<!-- a_review_2 -->
+<g id="a_review_2" class="node">
+<title>a_review_2</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="897.04" cy="-848.14" rx="28.05" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="897.04" y="-844.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">내용?</text>
+</g>
+<!-- a_review_3 -->
+<g id="a_review_3" class="node">
+<title>a_review_3</title>
+<ellipse fill="none" stroke="#7b8794" stroke-width="1.3" cx="897.04" cy="-791.14" rx="37.76" ry="17.14"/>
+<text xml:space="preserve" text-anchor="middle" x="897.04" y="-787.24" font-family="Malgun Gothic" font-size="13.00" fill="#334155">작성일시</text>
+</g>
+<!-- r1 -->
+<g id="relation_r1" class="node">
+<title>r1</title>
+<polygon fill="#ffffff" stroke="#596a7e" stroke-width="1.3" points="205.84,-1005.5 158.2,-984.14 205.84,-962.78 253.48,-984.14 205.84,-1005.5"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-980.24" font-family="Malgun Gothic" font-size="13.00" fill="#173450">예약한다</text>
+</g>
+<!-- r6 -->
+<g id="relation_r6" class="node">
+<title>r6</title>
+<polygon fill="#ffffff" stroke="#596a7e" stroke-width="1.3" points="392.52,-954.5 318.88,-933.14 392.52,-911.78 466.16,-933.14 392.52,-954.5"/>
+<text xml:space="preserve" text-anchor="middle" x="392.52" y="-929.24" font-family="Malgun Gothic" font-size="13.00" fill="#173450">적립·사용한다</text>
+</g>
+<!-- r7 -->
+<g id="relation_r7" class="node">
+<title>r7</title>
+<polygon fill="#ffffff" stroke="#596a7e" stroke-width="1.3" points="580.98,-1239.5 520.34,-1218.14 580.98,-1196.78 641.62,-1218.14 580.98,-1239.5"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-1214.24" font-family="Malgun Gothic" font-size="13.00" fill="#173450">포인트 변동</text>
+</g>
+<!-- r8 -->
+<g id="relation_r8" class="node">
+<title>r8</title>
+<polygon fill="#ffffff" stroke="#596a7e" stroke-width="1.3" points="392.52,-888.5 344.88,-867.14 392.52,-845.78 440.16,-867.14 392.52,-888.5"/>
+<text xml:space="preserve" text-anchor="middle" x="392.52" y="-863.24" font-family="Malgun Gothic" font-size="13.00" fill="#173450">작성한다</text>
+</g>
+<!-- r9 -->
+<g id="relation_r9" class="node">
+<title>r9</title>
+<polygon fill="#ffffff" stroke="#596a7e" stroke-width="1.3" points="580.98,-670.5 543.09,-649.14 580.98,-627.78 618.87,-649.14 580.98,-670.5"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-645.24" font-family="Malgun Gothic" font-size="13.00" fill="#173450">받는다</text>
+</g>
+<!-- r10 -->
+<g id="relation_r10" class="node">
+<title>r10</title>
+<polygon fill="#ffffff" stroke="#596a7e" stroke-width="1.3" points="580.98,-1001.5 520.34,-980.14 580.98,-958.78 641.62,-980.14 580.98,-1001.5"/>
+<text xml:space="preserve" text-anchor="middle" x="580.98" y="-976.24" font-family="Malgun Gothic" font-size="13.00" fill="#173450">후기의 근거</text>
+</g>
+<!-- r16 -->
+<g id="relation_r16" class="node">
+<title>r16</title>
+<polygon fill="#ffffff" stroke="#596a7e" stroke-width="1.3" points="205.84,-767.5 167.95,-746.14 205.84,-724.78 243.73,-746.14 205.84,-767.5"/>
+<text xml:space="preserve" text-anchor="middle" x="205.84" y="-742.24" font-family="Malgun Gothic" font-size="13.00" fill="#173450">찜한다</text>
+</g>
+<!-- attr_r16 -->
+<g id="node58" class="node">
+<title>attr_r16</title>
+<ellipse fill="white" stroke="#7b8794" stroke-width="1.3" cx="392.52" cy="-746.14" rx="50.24" ry="24.27"/>
+<text xml:space="preserve" text-anchor="middle" x="392.52" y="-742.24" font-family="Malgun Gothic" font-size="13.00" fill="#173450">찜한 시각</text>
+</g>
+</g>
+</svg>
