@@ -7,7 +7,7 @@ CREATE DATABASE studycafe
   DEFAULT COLLATE utf8mb4_0900_ai_ci;
 USE studycafe;
 
--- 회원 (일반 이용자 / 카페 사장 / 관리자)
+-- 회원 (일반 이용자)
 CREATE TABLE member (
   member_id     BIGINT       NOT NULL AUTO_INCREMENT,
   email         VARCHAR(100) NOT NULL,
@@ -15,7 +15,6 @@ CREATE TABLE member (
   name          VARCHAR(50)  NOT NULL,
   phone         VARCHAR(20),                  -- 숫자만 저장(01012345678). 한 번호로 한 번만 가입
   phone_verified BOOLEAN     NOT NULL DEFAULT FALSE,
-  role          ENUM('USER','OWNER','ADMIN') NOT NULL DEFAULT 'USER',
   point_balance INT          NOT NULL DEFAULT 0,
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (member_id),
@@ -63,7 +62,6 @@ CREATE TABLE region (
 CREATE TABLE cafe (
   cafe_id        BIGINT        NOT NULL AUTO_INCREMENT,
   kakao_place_id VARCHAR(30),
-  owner_id       BIGINT,
   region_id      BIGINT        NOT NULL,
   name           VARCHAR(100)  NOT NULL,
   address        VARCHAR(200)  NOT NULL,
@@ -73,14 +71,13 @@ CREATE TABLE cafe (
   place_url      VARCHAR(200),
   open_time      TIME          NOT NULL DEFAULT '00:00:00',
   close_time     TIME          NOT NULL DEFAULT '23:59:59',
-  info_source    ENUM('KAKAO','OWNER','MANUAL') NOT NULL DEFAULT 'KAKAO',
+  info_source    ENUM('KAKAO','MANUAL') NOT NULL DEFAULT 'KAKAO',
   fetched_at     DATETIME,
   is_active      BOOLEAN       NOT NULL DEFAULT TRUE,
   created_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (cafe_id),
   UNIQUE KEY uq_cafe_kakao (kakao_place_id),
   KEY idx_cafe_region (region_id),
-  CONSTRAINT fk_cafe_owner  FOREIGN KEY (owner_id)  REFERENCES member (member_id) ON DELETE SET NULL,
   CONSTRAINT fk_cafe_region FOREIGN KEY (region_id) REFERENCES region (region_id)
 ) ENGINE=InnoDB;
 

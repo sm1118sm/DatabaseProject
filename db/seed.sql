@@ -18,15 +18,13 @@ INSERT INTO facility (code, name) VALUES
   ('LOUNGE',  '휴게 라운지');
 
 -- 회원 (비밀번호는 모두 demo1234) ---------------------------------------
-INSERT INTO member (email, password_hash, name, phone, phone_verified, role, point_balance) VALUES
-  ('demo@example.com',  '__DEMO_HASH__', '데모유저', '01011111111', TRUE, 'USER',  5000),
-  ('minji@example.com', '__DEMO_HASH__', '김민지',   '01022222222', TRUE, 'USER',  0),
-  ('owner@example.com', '__DEMO_HASH__', '카페사장', '01044444444', TRUE, 'OWNER', 0),
-  ('admin@example.com', '__DEMO_HASH__', '관리자',   '01055555555', TRUE, 'ADMIN', 0);
+INSERT INTO member (email, password_hash, name, phone, phone_verified, point_balance) VALUES
+  ('demo@example.com',  '__DEMO_HASH__', '데모유저', '01011111111', TRUE, 5000),
+  ('minji@example.com', '__DEMO_HASH__', '김민지',   '01022222222', TRUE, 0);
 
 -- 샘플 카페 4곳 (가상) -----------------------------------------------------
-INSERT INTO cafe (owner_id, region_id, name, address, phone, latitude, longitude, info_source)
-SELECT (SELECT member_id FROM member WHERE email = 'owner@example.com'), r.region_id, t.name, t.address, t.phone, t.lat, t.lng, 'MANUAL'
+INSERT INTO cafe (region_id, name, address, phone, latitude, longitude, info_source)
+SELECT r.region_id, t.name, t.address, t.phone, t.lat, t.lng, 'MANUAL'
 FROM (
   SELECT '서울특별시' AS sido, '마포구' AS sigungu, '(예시) 모아 스터디카페 홍대점' AS name, '서울 마포구 (가상 주소) 1' AS address, '02-000-0001' AS phone, 37.5563610 AS lat, 126.9236650 AS lng
   UNION ALL SELECT '서울특별시', '마포구', '(예시) 모아 스터디카페 합정점', '서울 마포구 (가상 주소) 2', '02-000-0002', 37.5496280, 126.9139500
