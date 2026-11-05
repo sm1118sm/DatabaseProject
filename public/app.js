@@ -3,7 +3,7 @@
 (() => {
   'use strict';
   const D = window.SC_DATA;
-  const { FAC, SEAT, PLAN, DAYS } = D;
+  const { SEAT, PLAN, DAYS } = D;
   const $ = (s, el = document) => el.querySelector(s);
   const won = (n) => Math.round(n).toLocaleString('ko-KR') + '원';
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -72,7 +72,6 @@
     phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z',
   };
   const ico = (n, s = 18) => `<svg class="ico" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[n]}"/></svg>`;
-  const FACICO = { s: 'snack', p: 'printer', l: 'locker', h: 'moon', e: 'plug', w: 'shower', g: 'sofa' };
   const PHOTO_LABEL = ['열람실', '집중석 부스', '스낵바', '스터디룸', '휴게 라운지'];
 
   // 카카오는 사진을 주지 않아서, 사진 자리에는 카페마다 색만 다른 깔끔한 자리표시를 둔다
@@ -86,11 +85,11 @@
   const defStart = () => clamp(new Date().getHours() + 1, 9, 18);
   const freshQuery = () => ({
     mode: 'HOURLY', plan: 'MONTH', date: todayStr(), start: defStart(), end: defStart() + 3,
-    seat: 'ANY', people: 1, fac: [], sido: '서울특별시', sigungu: '강남구', radius: 0, geo: null,
+    seat: 'ANY', people: 1, sido: '서울특별시', sigungu: '강남구', radius: 0, geo: null,
     nearStation: false, nearUniv: false, sort: 'price', view: 'map',
   });
   const PAGE = Infinity; // 목록은 나누지 않고 선택한 지역의 카페를 전부 보여준다
-  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, me: null, locating: false, kakao: false, mapStatus: 'loading', regionDone: new Set(), regionTime: new Map(), inflight: new Map(), regionLoading: null, regionError: null, limit: Infinity, adv: false, facMore: false };
+  const S = { q: freshQuery(), book: null, hl: null, cancelId: null, resTab: 'UP', pending: null, me: null, locating: false, kakao: false, mapStatus: 'loading', regionDone: new Set(), regionTime: new Map(), inflight: new Map(), regionLoading: null, regionError: null, limit: Infinity, adv: false };
   // 실제 데이터로 교체되면서 빠진 샘플 카페도 찾을 수 있게 보관한다 (예약 내역 표시용)
   const archived = [];
   const stubs = new Map(); // 서버의 예약 내역에만 나오는 카페(아직 이 지역을 불러오지 않은 경우)
@@ -361,18 +360,17 @@
   // 홈: 히어로 + 검색 패널(① 이용 옵션 ② 지역) + 카테고리 + ③ 비교·추천 결과 + 이용 안내
   // =====================================================================================
   const CATS = [
-    ['24시간', 'moon', 'fac', 'h'], ['집중석', 'user', 'seat', 'FOCUS'], ['스터디룸', 'sofa', 'seat', 'ROOM'], ['스낵바', 'snack', 'fac', 's'],
-    ['프린터', 'printer', 'fac', 'p'], ['역세권', 'train', 'near', 'nearStation'], ['대학가', 'school', 'near', 'nearUniv'], ['사물함', 'locker', 'fac', 'l'],
+    ['집중석', 'user', 'seat', 'FOCUS'], ['스터디룸', 'sofa', 'seat', 'ROOM'],
+    ['역세권', 'train', 'near', 'nearStation'], ['대학가', 'school', 'near', 'nearUniv'],
   ];
-  // 홈 타일: 눌렀을 때 실제로 결과가 나오는 조건만 둔다 (시설 정보는 카카오에 없어 확인된 카페가 거의 없다)
+  // 홈 타일: 눌렀을 때 실제로 결과가 나오는 조건만 둔다
   const HOME_TILES = [
     ['내 주변', 'target', 'geo', 'geo'], ['최저가', 'card', 'sort', 'price'], ['평점 높은 곳', 'check', 'sort', 'rating'], ['평균보다 저렴', 'chart', 'sort', 'diff'],
     ['집중석', 'user', 'seat', 'FOCUS'], ['스터디룸', 'sofa', 'seat', 'ROOM'], ['역세권', 'train', 'near', 'nearStation'], ['대학가', 'school', 'near', 'nearUniv'],
   ];
-  const catOn = (kind, val) => (kind === 'fac' ? S.q.fac.includes(val) : kind === 'seat' ? S.q.seat === val : S.q[val]);
+  const catOn = (kind, val) => (kind === 'seat' ? S.q.seat === val : S.q[val]);
   // 실제 장소 정보와 가상 시연 카페를 구분한다.
   const realMode = () => D.cafes.some((c) => c.real && (S.q.geo || (c.sido === S.q.sido && c.sigungu === S.q.sigungu)));
-  const matchesFacilities = (c, selected) => selected.every((f) => (c.fac || []).includes(f));
   const catsHtml = () => CATS.map(([t, ic, kind, val]) => `<button class="cat" data-act="cat" data-kind="${kind}" data-v="${val}" aria-pressed="${!!catOn(kind, val)}"><span class="ci">${ico(ic, 18)}</span>${t}</button>`).join('');
   const refreshCats = () => { const e = $('#cats'); if (e) e.innerHTML = catsHtml(); };
 
@@ -394,11 +392,7 @@
     const sidos = [...new Set(D.regions.map((r) => r.sido))];
     const sigs = D.regions.filter((r) => r.sido === q.sido);
     const base = S.me ? '현재 위치' : (/중심$/.test(regionOf().label) ? regionOf().label : `${regionOf().label} (${q.sigungu} 중심)`);
-    // 시설 옵션은 앞의 4개만 보여주고 나머지는 '+ 더보기'로 펼친다 (이미 선택한 칩은 항상 보인다)
-    const facAll = Object.entries(FAC);
-    const facShown = S.facMore ? facAll : facAll.filter(([k], i) => i < 4 || q.fac.includes(k));
-    const facHidden = facAll.length - facShown.length;
-    const advCount = (q.seat !== 'ANY' ? 1 : 0) + (q.people > 1 ? 1 : 0) + q.fac.length + (q.radius ? 1 : 0) + (q.geo ? 1 : 0) + (q.nearStation ? 1 : 0) + (q.nearUniv ? 1 : 0);
+    const advCount = (q.seat !== 'ANY' ? 1 : 0) + (q.people > 1 ? 1 : 0) + (q.radius ? 1 : 0) + (q.geo ? 1 : 0) + (q.nearStation ? 1 : 0) + (q.nearUniv ? 1 : 0);
     return `<div class="sbar">
       <div class="sb-cell sb-mode" id="sec-opt"><span class="sb-lbl">이용 형태</span><div class="seg" role="group" aria-label="이용 형태">
         <button data-act="mode" data-v="HOURLY" aria-pressed="${q.mode === 'HOURLY'}">시간제</button>
@@ -419,15 +413,12 @@
     <div class="adv" id="sec-adv"${S.adv ? '' : ' hidden'}>
       <div class="panel-grid">
         <div class="pgroup">
-          <h3>좌석·시설</h3>
+          <h3>좌석·인원</h3>
           <div class="field"><span class="lbl">좌석 유형</span><div class="chips">
             ${[['ANY', '전체'], ['NORMAL', '일반석'], ['FOCUS', '집중석'], ['ROOM', '스터디룸']].map(([k, t]) => `<button class="chip" data-act="seat" data-v="${k}" aria-pressed="${(q.people > 1 ? 'ROOM' : q.seat) === k}">${t}</button>`).join('')}</div></div>
           <div class="field"><span class="lbl">인원 수</span><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <div class="stepper"><button data-act="people" data-v="-1" aria-label="인원 줄이기">−</button><span>${q.people}명</span><button data-act="people" data-v="1" aria-label="인원 늘리기">+</button></div>
             ${q.people > 1 ? '<p class="note">2인 이상은 스터디룸만 예약할 수 있어요.</p>' : ''}</div></div>
-          <div class="field" style="margin-bottom:0"><span class="lbl">시설 옵션</span><div class="chips">
-            ${facShown.map(([k, t]) => `<button class="chip" data-act="fac" data-v="${k}" aria-pressed="${q.fac.includes(k)}">${ico(FACICO[k], 15)}${t}</button>`).join('')}${facHidden > 0 ? `<button class="chip more" data-act="facmore">+ 더보기 ${facHidden}</button>` : S.facMore ? '<button class="chip more" data-act="facmore">접기</button>' : ''}</div>
-            ${realMode() ? '<p class="note" style="margin-top:8px">시설은 카카오에 정보가 없어 <b>예시</b>로 부여한 값이에요(실제와 다를 수 있어요). 24시간만 카페 이름에 표기된 경우에 적용돼요.</p>' : ''}</div>
         </div>
         <div class="pgroup">
           <h3>거리·주변</h3>
@@ -487,7 +478,7 @@
     const seat = q.people > 1 ? `스터디룸 ${q.people}명` : q.seat === 'ANY' ? '좌석 전체' : SEAT[q.seat];
     const chip = (hash, icon, text) => `<button class="sumchip" data-act="goto" data-hash="${hash}">${ico(icon, 15)}${esc(text)}</button>`;
     return `<div class="sum">
-      <div class="sum-chips">${chip('area', 'pin', where)}${chip('options', 'clock', when)}${chip('options', 'user', seat)}${q.fac.length ? chip('options', 'check', q.fac.map((k) => FAC[k]).join('·') + (realMode() && q.fac.some((k) => k !== 'h') ? ' (예시)' : '')) : ''}${q.radius && !q.geo ? chip('area', 'target', `반경 ${q.radius}km`) : ''}</div>
+      <div class="sum-chips">${chip('area', 'pin', where)}${chip('options', 'clock', when)}${chip('options', 'user', seat)}${q.radius && !q.geo ? chip('area', 'target', `반경 ${q.radius}km`) : ''}</div>
       <div class="sum-act"><button class="btn sm" data-act="goto" data-hash="options">조건 바꾸기</button><button class="btn sm" data-act="reset">초기화</button></div>
     </div>`;
   }
@@ -496,7 +487,7 @@
     const where = q.geo ? (q.radius ? `내 주변 ${q.radius}km 이내` : '내 주변') : `${q.sido} ${q.sigungu}`;
     const when = v.mode === 'HOURLY' ? `${fmtDate(q.date)} ${hh(q.start)}–${hh(q.end)}` : `${fmtDate(q.date)} 시작 · ${PLAN[q.plan]}`;
     const seat = q.people > 1 ? `스터디룸 ${q.people}명` : q.seat === 'ANY' ? '좌석 전체' : SEAT[q.seat];
-    const rows = [['지역', where], ['이용 형태', v.mode === 'HOURLY' ? '시간제' : '기간제'], ['일시', when], ['좌석', seat], ['시설', q.fac.length ? q.fac.map((k) => FAC[k]).join('·') : '선택 안 함'], ['거리', q.geo ? (q.radius ? `내 위치에서 반경 ${q.radius}km` : '내 위치 · 가까운 지역 전체') : q.radius ? `반경 ${q.radius}km` : '제한 없음'], ['정렬', { price: '최저가순', distance: '거리순', rating: '평점순', diff: '평균 대비 저렴순' }[q.sort] || '최저가순']];
+    const rows = [['지역', where], ['이용 형태', v.mode === 'HOURLY' ? '시간제' : '기간제'], ['일시', when], ['좌석', seat], ['거리', q.geo ? (q.radius ? `내 위치에서 반경 ${q.radius}km` : '내 위치 · 가까운 지역 전체') : q.radius ? `반경 ${q.radius}km` : '제한 없음'], ['정렬', { price: '최저가순', distance: '거리순', rating: '평점순', diff: '평균 대비 저렴순' }[q.sort] || '최저가순']];
     return `<h3>선택한 조건</h3><dl>${rows.map(([k, t]) => `<div><dt>${k}</dt><dd>${esc(t)}</dd></div>`).join('')}</dl>
       <button class="btn primary lg block" data-act="runCompare">이 조건으로 비교하기 →</button>
       ${condReady() ? '' : '<p class="note gatenote">지역을 고르면 비교·추천 메뉴가 열려요.</p>'}
@@ -558,7 +549,7 @@
     const occ = [2, 8, 13, 14, 21, 26, 30, 35];
     const seats = Array.from({ length: 30 }, (_, i) => `<i class="${occ.includes(i) ? 't' : ''}"></i>`).join('');
     const feat = [
-      ['calendar', '이용 옵션', '시간제·기간제, 좌석 유형, 시설까지 원하는 조건을 정해요.', 'options', 'f1'],
+      ['calendar', '이용 옵션', '시간제·기간제, 좌석 유형과 인원을 정해요.', 'options', 'f1'],
       ['pin', '지역 설정', '동네를 고르거나 내 위치로 가까운 곳을 찾아요.', 'area', 'f2'],
       ['chart', '비교·추천', '지역 평균 요금과 비교해 저렴한 곳부터 보여 드려요.', 'compare', 'f3'],
       ['list', '고객 예약', '남은 좌석을 번호까지 골라 예약하고 변경·취소도 해요.', 'reservations', 'f4'],
@@ -631,9 +622,9 @@
 
   function flowHtml() {
     const cols = [
-      ['calendar', '이용 옵션 선택', [['이용 형태 선택', '시간제 / 기간제'], ['이용 시간·기간 설정', '날짜, 시작·종료 시간, 좌석 유형(일반석·집중석 등)'], ['필터·조건 설정', '인원 수, 시설 옵션(스낵바·프린터 등)']]],
+      ['calendar', '이용 옵션 선택', [['이용 형태 선택', '시간제 / 기간제'], ['이용 시간·기간 설정', '날짜, 시작·종료 시간, 좌석 유형(일반석·집중석 등)'], ['필터·조건 설정', '인원 수, 좌석 유형']]],
       ['pin', '지역 설정', [['검색 지역 선택', '시/도, 구/군 단위 선택 · 현재 위치 기반 검색(선택)'], ['거리·이동 시간 기준 필터', '반경 1km, 3km, 5km 설정'], ['추가 지역 조건', '역 근처, 대학교 근처 등']]],
-      ['chart', '스터디카페 비교 및 추천', [['조건에 맞는 목록 조회', null], ['지역 내 평균 가격 제공', '시간제·기간제별 평균 가격 표시'], ['정렬', '최저가·거리·평점 순'], ['상세 정보 제공', '가격, 위치, 좌석 수, 시설 사진, 이용 후기, 운영 시간']]],
+      ['chart', '스터디카페 비교 및 추천', [['조건에 맞는 목록 조회', null], ['지역 내 평균 가격 제공', '시간제·기간제별 평균 가격 표시'], ['정렬', '최저가·거리·평점 순'], ['상세 정보 제공', '가격, 위치, 좌석 수, 이용 후기, 운영 시간']]],
       ['list', '고객 예약', [['선택한 스터디카페 예약', '날짜·시간·좌석 선택 후 예약'], ['실시간 좌석 현황 확인', '예약 가능 좌석 표시'], ['결제 진행', '결제 수단 선택 및 결제 완료'], ['예약 내역 관리', '예약 확인·변경·취소'], ['이용 완료 후 후기 작성', '평점 및 리뷰 등록']]],
     ];
     return `<div class="flow">${cols.map(([ic, t, items], i) => `<div class="flowcard"><div class="fh"><span class="fi">${ico(ic, 22)}</span><div><div class="fn">STEP ${i + 1}</div><h3>${t}</h3></div></div>
@@ -661,7 +652,6 @@
       if (q.radius && !ignoreRadius && d > q.radius) continue;
       // 내 주변 + 반경 제한 없음: 예전에 불러온 먼 지역의 카페가 섞이지 않게 내 위치와 가까운 지역의 카페만 쓴다
       if (q.geo && !q.radius && !ignoreRadius && !nearKeys.has(regKey(c))) continue;
-      if (!matchesFacilities(c, q.fac)) continue; // 미확인 시설을 보유한 것으로 간주하지 않는다
       if (q.nearStation && !c.station) continue;
       if (q.nearUniv && !c.univ) continue;
       if (!isOpen(c, v)) continue;
@@ -692,12 +682,11 @@
     const seats = `<span data-seat-cafe="${c.id}">${listSeatsHtml(c, v)}</span>`;
     const where = [c.station ? `<span>${ico('train', 14)}${esc(c.station)}</span>` : '', c.univ ? `<span>${ico('school', 14)}${esc(c.univ)}</span>` : ''].join('');
     return `<li class="card${S.hl === c.id ? ' hl' : ''}" id="card-${c.id}" data-act="open" data-id="${c.id}">
-      <div class="thumbbox">${photo(c, 0)}<div class="tags">${rank}${c.fac.includes('h') ? `<span class="tag">24시간${c.real ? ' (이름 기준)' : ''}</span>` : ''}${c.real ? '<span class="tag">요금 예시</span>' : ''}</div></div>
+      <div class="thumbbox">${photo(c, 0)}<div class="tags">${rank}${c.real ? '<span class="tag">요금 예시</span>' : ''}</div></div>
       <div class="cbody">
         <div class="cname">${esc(c.name)}</div>
         <div class="cloc"><span>${ico('pin', 14)}${esc(c.sigungu)} · ${km(d)}</span>${where}</div>
         <div class="crate">${r.n ? `<span class="star">★</span> ${r.avg.toFixed(1)} <span class="muted">(${r.n})</span>` : '<span class="muted">후기 없음</span>'}</div>
-        <div class="cfac">${c.real && c.fac.some((f) => f !== 'h') ? '<span class="exlab">시설 예시</span>' : ''}${c.fac.filter((f) => f !== 'h').slice(0, 4).map((f) => `<span>${FAC[f]}</span>`).join('')}</div>
         <div class="cdiff">${diffBadge(diff, avg)}${diffBar(p, avg, cls)}</div>
         <div class="cprice"><span class="p">${v.mode === 'HOURLY' ? '시간당' : PLAN[v.plan]}${c.real ? ' (예시)' : ''} <b>${won(p)}</b></span>${seats}</div>
       </div></li>`;
@@ -737,7 +726,7 @@
     const empty = loading ? `<li class="empty"><h3>카카오맵에서 ${esc(q.sigungu)} 스터디카페를 불러오는 중이에요</h3><p class="muted">처음 보는 지역은 몇 초 걸려요. 한 번 불러온 지역은 다음부터 바로 보여요.</p></li>`
       : noKakao ? `<li class="empty"><h3>이 지역은 카카오맵 연결이 필요해요</h3><p class="muted">지도를 불러오지 못해 실제 카페 정보를 가져올 수 없어요. 잠시 뒤 다시 시도해 주세요.</p></li>`
       : nearD != null ? `<li class="empty"><h3>반경 ${q.radius}km 안에는 카페가 없어요</h3><p class="muted">가장 가까운 카페는 ${S.me || q.geo ? '내 위치' : `${esc(q.sigungu)} 중심`}에서 ${km(nearD)} 떨어져 있어요.</p>${q.geo ? (RADIUS_KM.find((k) => k >= nearD) ? `<button class="btn primary" data-act="setRadius" data-k="${RADIUS_KM.find((k) => k >= nearD)}">반경 ${RADIUS_KM.find((k) => k >= nearD)}km로 넓혀 보기</button>` : '<button class="btn primary" data-act="geo">내 위치 해제하고 지역 고르기</button>') : '<button class="btn primary" data-act="noRadius">반경 제한 없음으로 보기</button>'}</li>`
-      : `<li class="empty"><h3>${q.fac.length ? '선택한 시설이 확인된 카페가 없어요' : '조건에 맞는 스터디카페가 없어요'}</h3><p class="muted">${q.fac.length ? '시설 정보 미확인은 시설이 없다는 뜻이 아니에요. 시설 조건을 해제하면 다른 카페도 볼 수 있어요.' : q.geo ? '내 주변에 카페가 없을 수 있어요. 지역을 직접 선택해 보세요.' : S.regionError === `${q.sido}|${q.sigungu}` ? '카카오맵에서 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.' : '이 지역에는 카카오맵에 등록된 스터디카페가 없거나, 조건에 맞는 곳이 없어요.'}</p><button class="btn primary" data-act="${q.fac.length ? 'clearFac' : 'reset'}">${q.fac.length ? '시설 조건 해제' : '조건 초기화'}</button></li>`;
+      : `<li class="empty"><h3>조건에 맞는 스터디카페가 없어요</h3><p class="muted">${q.geo ? '내 주변에 카페가 없을 수 있어요. 지역을 직접 선택해 보세요.' : S.regionError === `${q.sido}|${q.sigungu}` ? '카카오맵에서 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.' : '이 지역에는 카카오맵에 등록된 스터디카페가 없거나, 조건에 맞는 곳이 없어요.'}</p><button class="btn primary" data-act="reset">조건 초기화</button></li>`;
     const hlIdx = list.findIndex((it) => it.c.id === S.hl);
     if (hlIdx >= S.limit) S.limit = hlIdx + 1; // 지도에서 고른 카페가 목록에 보이도록 목록을 그 위치까지 펼친다
     const shown = list.slice(0, S.limit);
@@ -748,8 +737,7 @@
     const t0 = !q.geo && S.regionTime.get(regKey(regionOf()));
     const asof = t0 && realMode() ? `카카오맵 ${ago(t0)} 기준` : '';
     const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.quick.map(([sd, sg]) => `<button class="chip" data-act="region" data-s="${esc(sd)}" data-g="${esc(sg)}" aria-pressed="${!q.geo && q.sido === sd && q.sigungu === sg}">${esc(sg)}</button>`).join('')}</div>`;
-    const facNote = q.fac.length ? `<p class="note" role="status">시설 조건: ${q.fac.map((f) => esc(FAC[f] || f)).join(' · ')} — 선택한 시설이 확인된 카페만 표시해요. 미확인 카페는 제외돼요.</p>` : '';
-    box.innerHTML = `${locNote}${realNote}${facNote}${avgStrip(list)}
+    box.innerHTML = `${locNote}${realNote}${avgStrip(list)}
       <div class="resbar"><div class="count">${esc(where)} 스터디카페 ${list.length}곳<small>${SEAT[v.type]} · ${esc(when)}${asof ? ` · ${asof}` : ''}</small></div>
         <div class="tabs">${sorts.map(([k, t]) => `<button class="tab" data-act="sort" data-v="${k}" aria-pressed="${q.sort === k}">${t}</button>`).join('')}
           <button class="tab map-toggle" data-act="view" data-v="${q.view === 'map' ? 'list' : 'map'}" aria-pressed="${q.view === 'map'}">${ico('pin', 15)} ${q.view === 'map' ? '목록만 보기' : '지도로 보기'}</button></div></div>
@@ -889,7 +877,7 @@
 
   // ---- 카카오 장소 검색(Places API)으로 가져온 실제 스터디카페 ---------------------------------
   // 이름·주소·전화번호·좌표·카카오맵 링크·가까운 역/대학은 카카오 정보다.
-  // 카카오는 요금·좌석 수·시설·사진·후기를 주지 않으므로 요금과 좌석 수는 예시 값(c.real 로 표시)이다.
+  // 카카오는 요금·좌석 수·사진·후기를 주지 않으므로 요금과 좌석 수는 예시 값(c.real 로 표시)이다.
   // 전국 시·군·구를 한꺼번에 가져오면 호출이 너무 많아서, 사용자가 고른 시·군·구만 그때 검색하고 24시간 저장한다.
   // 정보를 받은 지 얼마나 지났는지 (예: 방금, 12분 전, 3시간 전)
   const ago = (t) => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : `${Math.floor(m / 60)}시간 전`; };
@@ -915,34 +903,23 @@
   // 카카오 주소(예: '서울 강남구 역삼동', '충남 천안시 서북구 ...')가 이 시·군·구에 속하는지
   // 시·도는 전체 이름('세종특별자치시', '강원특별자치도')이나 줄임말('충북', '경기') 어느 쪽으로 시작해도 인정한다. 세종은 시·군·구가 없다.
   const addrOk = (addr, r) => [r.sido, ...(D.ALIAS[r.sido] || [])].some((a) => addr.startsWith(a)) && (r.sigungu === r.sido || new RegExp(`(^| )${r.sigungu}( |$)`).test(addr));
-  // 시설은 카카오에 정보가 없어서, 요금·좌석 수처럼 '예시'를 카페마다 고정된 무작위로 붙인다 (화면에 '예시'로 표시).
-  // 24시간만은 무작위로 주지 않고, 카페 이름에 24시가 적힌 경우에만 '이름 기준'으로 붙인다.
-  const EX_FAC = [['s', 0.45], ['p', 0.4], ['l', 0.35], ['e', 0.55], ['g', 0.25], ['w', 0.12]];
-  function exampleFac(c) {
-    if (!c.real || Array.isArray(c.facEx)) return c;
-    const ex = EX_FAC.filter(([k, pr]) => hash(`${c.id}|fac|${k}`) < pr).map(([k]) => k);
-    c.facEx = ex;
-    c.fac = [...(/24\s*시|24\s*[Hh]/.test(c.name || '') ? ['h'] : []), ...ex];
-    return c;
-  }
-  const facNote = (c, f) => (!c.real ? '' : f === 'h' ? '이름 기준' : '예시');
   function fromPlace(p, region) {
     const id = Number(p.id), r = (k) => hash(`${id}|${k}`);
-    return exampleFac({
+    return {
       id, real: true, name: p.place_name, sido: region.sido, sigungu: region.sigungu,
       addr: p.road_address_name || p.address_name, lat: Number(p.y), lng: Number(p.x), phone: p.phone || '', url: p.place_url || '',
       open: 0, close: 24, busy: 0.6 + r('b') * 0.4, roomCap: r('c') < 0.5 ? 4 : 6,
       seats: { NORMAL: 30 + Math.floor(r('a') * 40), FOCUS: 8 + Math.floor(r('f') * 16), ROOM: 2 + Math.floor(r('r') * 3) },
-      fac: [], station: null, univ: null, reviews: [],
+      station: null, univ: null, reviews: [],
       price: D.makePrice(Math.round((1700 + r('n') * 2300) / 100) * 100),
-    });
+    };
   }
   function applyRegion(reg, real) { // 이 지역의 샘플 카페는 빼서 보관하고, 실제 카페를 넣는다
     for (let i = D.cafes.length - 1; i >= 0; i--) {
       const c = D.cafes[i];
       if (!c.real && c.sido === reg.sido && c.sigungu === reg.sigungu) archived.push(...D.cafes.splice(i, 1));
     }
-    real.forEach((c) => { exampleFac(c); if (!D.cafes.some((x) => x.id === c.id)) D.cafes.push(c); });
+    real.forEach((c) => { if (!D.cafes.some((x) => x.id === c.id)) D.cafes.push(c); });
     // 경계 상자의 한가운데는 산이나 바다일 수 있어서, 대표 역이 정해지지 않은 지역은 카페가 모인 곳의 중심을 거리 기준으로 쓴다
     if (real.length && /중심$/.test(reg.label)) {
       reg.center = [real.reduce((s, c) => s + c.lat, 0) / real.length, real.reduce((s, c) => s + c.lng, 0) / real.length];
@@ -1119,15 +1096,14 @@
       <div class="crumbs"><button data-act="goto" data-hash="home">홈</button> › <span>${esc(c.sido)} ${esc(c.sigungu)}</span> › <span>${esc(c.name)}</span></div>
       <div class="dhead"><div><h1>${esc(c.name)}</h1>
         <div class="meta"><span>${ico('pin', 16)}${esc(c.addr)}</span>${c.station ? `<span>${ico('train', 16)}${esc(c.station)}</span>` : ''}<span>${ico('clock', 16)}${hoursText(c)}</span><span><b style="color:var(--gold)">★</b> ${r.n ? r.avg.toFixed(1) : '-'} (${r.n})</span></div></div>
-        <div class="chips">${c.fac.map((f) => `<span class="chip">${ico(FACICO[f], 15)}${FAC[f]}${c.real ? `<small class="exs">${facNote(c, f)}</small>` : ''}</span>`).join('')}</div></div>
+      </div>
       <div class="gallery gallery-one"><figure>${photo(c, 0)}</figure></div>
       <p class="photonote">${c.real && c.url ? `사진은 <a href="${esc(c.url)}" target="_blank" rel="noopener">카카오맵에서 보기 ↗</a>` : '사진은 준비 중이에요.'}</p>
       ${c.real ? `<p class="note" style="margin:12px 0 0">이 카페의 <b>이름·주소·전화번호·위치</b>는 카카오맵 정보이고, <b>요금·좌석 수는 예시</b>예요. 실제 정보는 ${c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">카카오맵에서 확인</a>` : '카카오맵에서 확인'}해 주세요.</p>` : ''}
       <div class="dlayout"><div class="dmain">
-        <nav class="subnav" aria-label="상세 메뉴">${[['sec-price', '가격'], ['sec-seats', '좌석 현황'], ['sec-fac', '시설'], ['sec-loc', '위치·운영'], ['sec-rev', `후기 ${r.n}`]].map(([i, t]) => `<button data-act="nav" data-to="${i}">${t}</button>`).join('')}</nav>
+        <nav class="subnav" aria-label="상세 메뉴">${[['sec-price', '가격'], ['sec-seats', '좌석 현황'], ['sec-loc', '위치·운영'], ['sec-rev', `후기 ${r.n}`]].map(([i, t]) => `<button data-act="nav" data-to="${i}">${t}</button>`).join('')}</nav>
         <section class="dsec" id="sec-price"><h2>${ico('chart', 20)}가격 정보${c.real ? ' <small class="muted" style="font-size:13px;font-weight:400">(예시 요금)</small>' : ''}</h2>${priceTable(c)}</section>
         <section class="dsec" id="sec-seats"><h2>${ico('user', 20)}실시간 좌석 현황</h2><div id="seatbox"></div></section>
-        <section class="dsec" id="sec-fac"><h2>${ico('sofa', 20)}시설 안내</h2>${c.real ? '<p class="muted" style="margin:0 0 12px">시설 정보는 카카오맵이 제공하지 않아 <b>예시</b>로 표시해요(실제와 다를 수 있어요). 24시간은 카페 이름에 표기된 경우에만 보여요. 실제 시설은 카카오맵 링크에서 확인해 주세요.</p>' : ''}<div class="facgrid">${Object.entries(FAC).map(([k, t]) => `<div class="facitem${c.fac.includes(k) ? '' : ' off'}"><span class="ci">${ico(FACICO[k], 20)}</span>${t}${c.fac.includes(k) ? (c.real ? ` (${facNote(c, k)})` : '') : (c.real ? ' (확인 안 됨)' : ' (없음)')}</div>`).join('')}</div></section>
         <section class="dsec" id="sec-loc"><h2>${ico('pin', 20)}위치·운영 정보</h2><div class="locgrid">
           <ul class="infolist">
             <li>${ico('pin', 18)}<span>${esc(c.addr)}</span></li>
@@ -1506,7 +1482,7 @@
         (S.locating ? waitLoc() : applyLocation()).then((ok) => { if (ok) done(); else toast(S.locFail === 'denied' ? '위치 권한이 꺼져 있어요. 주소창의 자물쇠에서 위치를 허용해 주세요.' : '현재 위치를 확인하지 못했어요. 지역을 직접 골라 주세요.'); });
         return;
       }
-      if (kind === 'fac') { if (!S.q.fac.includes(v)) S.q.fac.push(v); } else if (kind === 'seat') { S.q.seat = v; S.q.people = 1; } else if (kind === 'sort') S.q.sort = v; else S.q[v] = true;
+      if (kind === 'seat') { S.q.seat = v; S.q.people = 1; } else if (kind === 'sort') S.q.sort = v; else S.q[v] = true;
       toast(APPLIED); location.hash = 'search';
     },
     soon: () => toast('준비 중인 페이지예요.'),
@@ -1514,7 +1490,6 @@
     open: (t) => { location.hash = 'cafe-' + t.dataset.id; },
     // ① 이용 옵션
     adv: () => { S.adv = !S.adv; refreshPanel(); },
-    facmore: () => { S.facMore = !S.facMore; refreshPanel(); },
     goArea: () => { if (!/^#(area|options|search)$/.test(location.hash)) location.hash = 'area'; else { const sel = $('#qSido'); if (sel) sel.focus(); } },
     locRetry: () => { S.locFail = null; toast('위치를 확인하는 중이에요…'); applyLocation(); },
     locHelp: () => openModal(`<h2>내 위치 허용하기</h2><p class="muted" style="margin:0 0 14px">한 번 거부하면 사이트가 다시 물어볼 수 없어서, 브라우저에서 직접 바꿔야 해요.</p>
@@ -1528,8 +1503,6 @@
     plan: (t) => { S.q.plan = t.dataset.v; afterQuery(); },
     seat: (t) => { S.q.seat = t.dataset.v; if (S.q.seat !== 'ROOM' && S.q.people > 1) S.q.people = 1; if (S.q.seat === 'ROOM' && S.q.people < 2) S.q.people = 1; afterQuery(); },
     people: (t) => { S.q.people = clamp(S.q.people + Number(t.dataset.v), 1, 8); if (S.q.people > 1) S.q.seat = 'ROOM'; afterQuery(); },
-    fac: (t) => { const f = t.dataset.v, i = S.q.fac.indexOf(f); if (i < 0) S.q.fac.push(f); else S.q.fac.splice(i, 1); afterQuery(); },
-    clearFac: () => { S.q.fac = []; afterQuery(); },
     // ② 지역
     near: (t) => { S.q[t.dataset.k] = !S.q[t.dataset.k]; afterQuery(); },
     noRadius: () => { S.q.radius = 0; S.q.autoRadius = false; afterQuery(); }, // 반경 제한 없음으로 되돌린다
@@ -1544,8 +1517,7 @@
     },
     cat: (t) => {
       const { kind, v } = t.dataset;
-      if (kind === 'fac') ACT.fac({ dataset: { v } });
-      else if (kind === 'seat') { S.q.seat = S.q.seat === v ? 'ANY' : v; S.q.people = 1; } else S.q[v] = !S.q[v];
+      if (kind === 'seat') { S.q.seat = S.q.seat === v ? 'ANY' : v; S.q.people = 1; } else S.q[v] = !S.q[v];
       document.querySelectorAll('.cat').forEach((b) => { b.setAttribute('aria-pressed', String(!!catOn(b.dataset.kind, b.dataset.v))); });
       afterQuery();
     },
