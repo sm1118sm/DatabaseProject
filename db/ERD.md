@@ -28,7 +28,7 @@ erDiagram
   SEAT_TYPE ||--o{ PRICE_PLAN : "적용된다"
   SEAT ||--o{ RESERVATION : "예약된다"
   SEAT ||--o{ RESERVATION_SLOT : "점유된다"
-  RESERVATION ||--|{ RESERVATION_SLOT : "시간을 점유"
+  RESERVATION ||--o{ RESERVATION_SLOT : "시간을 점유"
   RESERVATION ||--o| PAYMENT : "결제된다"
   RESERVATION |o--o| REVIEW : "후기의 근거"
   RESERVATION |o--o{ POINT_LEDGER : "포인트 변동"
@@ -57,6 +57,7 @@ erDiagram
     tinyint attempts
     datetime expires_at
     datetime verified_at
+    datetime created_at
   }
   REGION {
     bigint region_id PK
@@ -81,15 +82,16 @@ erDiagram
     enum info_source "KAKAO OWNER MANUAL"
     datetime fetched_at "카카오에서 가져온 시각"
     boolean is_active
+    datetime created_at
   }
   FACILITY {
-    bigint facility_id PK
+    tinyint facility_id PK
     varchar code UK "SNACK PRINTER LOCKER ..."
     varchar name
   }
   CAFE_FACILITY {
     bigint cafe_id PK, FK
-    bigint facility_id PK, FK
+    tinyint facility_id PK, FK
   }
   SEAT_TYPE {
     tinyint seat_type_id PK
