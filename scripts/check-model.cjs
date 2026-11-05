@@ -37,9 +37,9 @@ for (const m of sql.matchAll(/CREATE TABLE (\w+) \(([\s\S]*?)\n\) ENGINE/g)) {
   }
 }
 assert.deepEqual(data.tables.map(t => t.name).sort(), names.sort(), 'Table sets differ');
-const junctions = ['favorite', 'cafe_facility'];
+const junctions = [];
 assert.deepEqual(data.entities.map(e => e.table.toLowerCase()).sort(), names.filter(n => !junctions.includes(n)).sort(), 'Conceptual entity set differs');
-assert.equal(data.relationships.length, fkCount - 4 + 2, 'Conceptual relationship count differs');
+assert.equal(data.relationships.length, fkCount, 'Conceptual relationship count differs');
 for (const r of data.relationships) {
   assert.ok(data.entities.some(e => e.id === r.a) && data.entities.some(e => e.id === r.b), `Unknown endpoint: ${r.id}`);
 }

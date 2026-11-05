@@ -1,4 +1,4 @@
--- 스터디모아 스키마 v2 (MySQL 8.0+) — ERD: db/ERD.md
+-- 스터디모아 스키마 v5 (MySQL 8.0+) — ERD: db/ERD.md
 -- 실행: npm run db:init -- --force   (studycafe DB 를 지우고 다시 만든다)
 
 DROP DATABASE IF EXISTS studycafe;
@@ -47,7 +47,7 @@ CREATE TABLE region (
   UNIQUE KEY uq_region (sido, sigungu)
 ) ENGINE=InnoDB;
 
--- 스터디카페. 이름·주소·전화·좌표·링크는 카카오 장소 검색 정보이고 요금·좌석·시설은 카카오가 주지 않는다.
+-- 스터디카페. 이름·주소·전화·좌표·링크는 카카오 장소 검색 정보이고 요금·좌석은 카카오가 주지 않는다.
 CREATE TABLE cafe (
   cafe_id        BIGINT        NOT NULL AUTO_INCREMENT,
   kakao_place_id VARCHAR(30),
@@ -71,22 +71,6 @@ CREATE TABLE cafe (
 ) ENGINE=InnoDB;
 
 -- 시설 종류 (스낵바·프린터 등) 와 카페별 보유 시설
-CREATE TABLE facility (
-  facility_id TINYINT     NOT NULL AUTO_INCREMENT,
-  code        VARCHAR(20) NOT NULL,
-  name        VARCHAR(30) NOT NULL,
-  PRIMARY KEY (facility_id),
-  UNIQUE KEY uq_facility_code (code)
-) ENGINE=InnoDB;
-
-CREATE TABLE cafe_facility (
-  cafe_id     BIGINT  NOT NULL,
-  facility_id TINYINT NOT NULL,
-  PRIMARY KEY (cafe_id, facility_id),
-  CONSTRAINT fk_cf_cafe     FOREIGN KEY (cafe_id)     REFERENCES cafe (cafe_id) ON DELETE CASCADE,
-  CONSTRAINT fk_cf_facility FOREIGN KEY (facility_id) REFERENCES facility (facility_id)
-) ENGINE=InnoDB;
-
 -- 좌석 유형 (일반석·집중석·스터디룸)
 CREATE TABLE seat_type (
   seat_type_id TINYINT     NOT NULL AUTO_INCREMENT,
@@ -211,32 +195,3 @@ CREATE TABLE review (
   CONSTRAINT fk_review_resv   FOREIGN KEY (reservation_id) REFERENCES reservation (reservation_id) ON DELETE SET NULL,
   CONSTRAINT ck_review_rating CHECK (rating BETWEEN 1 AND 5)
 ) ENGINE=InnoDB;
-
--- 즐겨찾기 (회원 N:M 카페)
-CREATE TABLE favorite (
-  member_id  BIGINT   NOT NULL,
-  cafe_id    BIGINT   NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (member_id, cafe_id),
-  CONSTRAINT fk_fav_member FOREIGN KEY (member_id) REFERENCES member (member_id) ON DELETE CASCADE,
-  CONSTRAINT fk_fav_cafe   FOREIGN KEY (cafe_id)   REFERENCES cafe (cafe_id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- 뷰: 카페별 시간당 요금과 같은 시·구 평균 대비 차이 (윈도우 함수).
--- 평균은 사람이 확인한 요금(VERIFIED)만으로 계산해, 예시 값이 비교 기준을 흐리지 않게 한다.
-CREATE VIEW v_cafe_price_vs_region AS
-SELECT
-  c.cafe_id,
-  c.name                                   AS cafe_name,
-  r.sido,
-  r.sigungu,
-  st.code                                  AS seat_type,
-  p.price                                  AS hourly_price,
-  ROUND(AVG(p.price) OVER (PARTITION BY r.region_id, p.seat_type_id), 0) AS region_avg_price,
-  p.price - ROUND(AVG(p.price) OVER (PARTITION BY r.region_id, p.seat_type_id), 0) AS diff_from_avg,
-  COUNT(*) OVER (PARTITION BY r.region_id, p.seat_type_id)               AS cafe_count_in_region
-FROM price_plan p
-JOIN cafe      c  ON c.cafe_id       = p.cafe_id
-JOIN region    r  ON r.region_id     = c.region_id
-JOIN seat_type st ON st.seat_type_id = p.seat_type_id
-WHERE p.plan_type = 'HOURLY' AND p.price_source = 'VERIFIED';

@@ -125,10 +125,6 @@ app.get('/api/regions', wrap(async (req, res) => {
   res.json(rows);
 }));
 
-app.get('/api/facilities', wrap(async (req, res) => {
-  const [rows] = await pool.query('SELECT facility_id, code, name FROM facility ORDER BY facility_id');
-  res.json(rows);
-}));
 
 // ---- 회원: 휴대폰 인증 → 가입 (이메일·휴대폰 중복 불가) ---------------------------
 // 실제 문자 발송은 유료 문자 업체 계약이 필요해서, SMS_PROVIDER 가 없으면 모의 모드로 동작한다(인증번호를 응답에 담아 화면에 보여 준다).
@@ -273,18 +269,31 @@ app.get('/api/cafes/:id(\\d+)', wrap(async (req, res) => {
      FROM price_plan p JOIN seat_type st ON st.seat_type_id = p.seat_type_id
      WHERE p.cafe_id = ? ORDER BY st.seat_type_id, p.price`, [id]);
   const [comparison] = await pool.query(
-    'SELECT seat_type, hourly_price, region_avg_price, diff_from_avg, cafe_count_in_region FROM v_cafe_price_vs_region WHERE cafe_id = ?', [id]);
-  const [facilities] = await pool.query(
-    `SELECT f.code, f.name FROM cafe_facility cf JOIN facility f ON f.facility_id = cf.facility_id
-     WHERE cf.cafe_id = ? ORDER BY f.facility_id`, [id]);
+    `SELECT seat_type, hourly_price, region_avg_price, diff_from_avg, cafe_count_in_region
+     FROM (SELECT
+  c.cafe_id,
+  c.name                                   AS cafe_name,
+  r.sido,
+  r.sigungu,
+  st.code                                  AS seat_type,
+  p.price                                  AS hourly_price,
+  ROUND(AVG(p.price) OVER (PARTITION BY r.region_id, p.seat_type_id), 0) AS region_avg_price,
+  p.price - ROUND(AVG(p.price) OVER (PARTITION BY r.region_id, p.seat_type_id), 0) AS diff_from_avg,
+  COUNT(*) OVER (PARTITION BY r.region_id, p.seat_type_id)               AS cafe_count_in_region
+FROM price_plan p
+JOIN cafe      c  ON c.cafe_id       = p.cafe_id
+JOIN region    r  ON r.region_id     = c.region_id
+JOIN seat_type st ON st.seat_type_id = p.seat_type_id
+WHERE p.plan_type = 'HOURLY' AND p.price_source = 'VERIFIED'
+     ) comparison WHERE cafe_id = ?`, [id]);
   const [reviews] = await pool.query(
     `SELECT rv.rating, rv.content, rv.created_at, m.name AS member_name
      FROM review rv JOIN member m ON m.member_id = rv.member_id
      WHERE rv.cafe_id = ? ORDER BY rv.created_at DESC LIMIT 20`, [id]);
-  res.json({ cafe, seats, plans, comparison, facilities, reviews });
+  res.json({ cafe, seats, plans, comparison, reviews });
 }));
 
-// ---- 화면이 보는 카페를 DB 에 등록 (처음 예약·찜할 때) ----------------------------------
+// ---- 화면이 보는 카페를 DB 에 등록 (처음 예약할 때) ----------------------------------
 // 카카오에서 가져온 카페는 예약이 처음 생길 때만 DB 에 저장한다. 전국 목록을 통째로 저장하지 않는다.
 // 좌석 수와 요금은 화면의 '예시' 값을 그대로 쓰며 price_source 는 EXAMPLE 이다.
 const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n >= lo && n <= hi ? n : null; };
@@ -610,30 +619,6 @@ app.post('/api/reviews', auth, requireVerified, wrap(async (req, res) => {
     throw e;
   }
   res.status(201).json({ ok: true });
-}));
-
-// ---- 즐겨찾기 -------------------------------------------------------------
-app.get('/api/me/favorites', auth, wrap(async (req, res) => {
-  const [rows] = await pool.query(
-    `SELECT c.cafe_id, c.name, r.sido, r.sigungu FROM favorite f
-     JOIN cafe c ON c.cafe_id = f.cafe_id JOIN region r ON r.region_id = c.region_id
-     WHERE f.member_id = ? ORDER BY f.created_at DESC`, [req.member.memberId]);
-  res.json(rows);
-}));
-
-app.put('/api/me/favorites/:cafeId', auth, wrap(async (req, res) => {
-  try {
-    await pool.query('INSERT IGNORE INTO favorite (member_id, cafe_id) VALUES (?, ?)', [req.member.memberId, Number(req.params.cafeId)]);
-  } catch (e) {
-    if (e.code === 'ER_NO_REFERENCED_ROW_2') return res.status(404).json({ error: '카페를 찾을 수 없습니다.' });
-    throw e;
-  }
-  res.json({ ok: true });
-}));
-
-app.delete('/api/me/favorites/:cafeId', auth, wrap(async (req, res) => {
-  await pool.query('DELETE FROM favorite WHERE member_id = ? AND cafe_id = ?', [req.member.memberId, Number(req.params.cafeId)]);
-  res.json({ ok: true });
 }));
 
 if (process.env.NODE_ENV === 'test') app.__newSession = newSession; // 테스트가 소셜 로그인 없이 세션을 만들 수 있게 (운영에서는 노출하지 않음)

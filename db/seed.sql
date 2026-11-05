@@ -1,21 +1,13 @@
--- 기준 데이터 + 시연용 샘플 (스키마 v2). 지역(region) 256곳은 scripts/init-db.js 가 public/regions.js 에서 먼저 넣는다.
+-- 기준 데이터 + 시연용 샘플 (스키마 v5). 지역(region) 256곳은 scripts/init-db.js 가 public/regions.js 에서 먼저 넣는다.
 -- 카페명·요금·후기는 모두 가상이며 이름 앞에 '(예시)'를 붙였다. 실제 카페와 확인한 요금은 별도로 입력한다.
 USE studycafe;
 
--- 좌석 유형 · 시설 종류 ------------------------------------------------
+-- 좌석 유형 ------------------------------------------------
 INSERT INTO seat_type (code, name, is_room) VALUES
   ('NORMAL', '일반석',   FALSE),
   ('FOCUS',  '집중석',   FALSE),
   ('ROOM',   '스터디룸', TRUE);
 
-INSERT INTO facility (code, name) VALUES
-  ('SNACK',   '스낵바'),
-  ('PRINTER', '프린터'),
-  ('LOCKER',  '사물함'),
-  ('H24',     '24시간'),
-  ('OUTLET',  '개인 콘센트'),
-  ('SHOWER',  '샤워실'),
-  ('LOUNGE',  '휴게 라운지');
 
 -- 회원 (비밀번호는 모두 demo1234) ---------------------------------------
 INSERT INTO member (email, password_hash, name, phone, phone_verified, point_balance) VALUES
@@ -31,12 +23,6 @@ FROM (
   UNION ALL SELECT '서울특별시', '강남구', '(예시) 모아 스터디카페 역삼점', '서울 강남구 (가상 주소) 3', '02-000-0003', 37.5006870, 127.0364370
   UNION ALL SELECT '경기도', '성남시 분당구', '(예시) 모아 스터디카페 정자점', '경기 성남시 분당구 (가상 주소) 4', '031-000-0004', 37.3670000, 127.1080000
 ) t JOIN region r ON r.sido = t.sido AND r.sigungu = t.sigungu;
-
--- 시설: 카페마다 스낵바·프린터·콘센트, 역삼점은 24시간 추가
-INSERT INTO cafe_facility (cafe_id, facility_id)
-SELECT c.cafe_id, f.facility_id FROM cafe c JOIN facility f ON f.code IN ('SNACK', 'PRINTER', 'OUTLET');
-INSERT INTO cafe_facility (cafe_id, facility_id)
-SELECT c.cafe_id, f.facility_id FROM cafe c JOIN facility f ON f.code = 'H24' WHERE c.name LIKE '%역삼점';
 
 -- 좌석: 카페마다 일반석 6 · 집중석 3 · 스터디룸 2 --------------------------------
 INSERT INTO seat (cafe_id, seat_type_id, label, capacity)
@@ -76,4 +62,3 @@ INSERT INTO payment (reservation_id, amount, method, status) VALUES (@resv, @hou
 INSERT INTO review (member_id, cafe_id, reservation_id, rating, content)
 VALUES ((SELECT member_id FROM member WHERE email = 'minji@example.com'), @cafe, NULL, 5, '(예시) 조용하고 좌석이 넓어요.');
 
-INSERT INTO favorite (member_id, cafe_id) VALUES (@member, @cafe);
