@@ -98,7 +98,7 @@
 
   // ---- 서버 연결 ----------------------------------------------------------------------------
   // 서버(npm start)가 떠 있으면 로그인·예약·후기·포인트를 서버 DB 로 처리하고, 정적 배포(Vercel)에서는 위의 브라우저 저장소로 동작한다.
-  const API = { on: false, token: null, social: {} };
+  const API = { on: false, token: null };
   const TOKEN_KEY = 'studymoa:token';
   const SV = { user: null, res: [], taken: new Map(), takenLoading: new Set(), takenError: new Set(), listSeats: new Map(), reviews: new Map(), dbId: new Map(), phoneOk: '' };
   const placeIdOf = (c) => (c.real ? String(c.id) : `sample-${c.id}`); // 서버가 카페를 알아보는 번호 (카카오 장소 번호)
@@ -132,7 +132,7 @@
       if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) return;
       const d = await r.json();
       if (!d || d.server !== true) return;
-      API.on = true; API.social = d.social || {};
+      API.on = true;
       try { API.token = localStorage.getItem(TOKEN_KEY); } catch { /* 저장소 사용 불가 */ }
       if (API.token) API.restoreP = restoreSession(); // 로그인 확인은 DB 를 거쳐 느릴 수 있어서 첫 화면을 막지 않는다
     } catch { /* 서버 없는 정적 배포 */ }
@@ -1270,7 +1270,6 @@
       showReceipt(r, c, method, d.totalPrice);
       refreshBook();
     } catch (e) {
-      if (e.data && e.data.needsPhone) { closeModal(); openPhoneVerify(); return; } // 소셜로 가입했고 휴대폰 인증 전이면 인증부터
       $('#payErr').textContent = e.status === 409 ? '방금 다른 분이 이 좌석을 예약했어요. 좌석을 다시 선택해 주세요.' : e.message;
       if (e.status === 409) { clearSeatCaches(); refreshBook(); }
       reset();
@@ -1287,15 +1286,6 @@
       ? `<button class="btn sm ghost" data-act="goto" data-hash="reservations">내 예약</button><span class="hello">${esc(u.name)}님</span><span class="pts">${u.points.toLocaleString('ko-KR')}P</span><button class="btn sm" data-act="logout">로그아웃</button>`
       : '<button class="btn sm ghost" data-act="goto" data-hash="reservations">내 예약</button><button class="btn sm" data-act="login">로그인</button><button class="btn sm primary" data-act="signup">회원가입</button>';
   }
-  // 카카오·네이버 버튼. 서버가 있고 키가 설정돼 있으면 실제 로그인으로 이동하고, 아니면 이유를 안내한다.
-  const KAKAO_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7l-1 3.6c-.1.3.3.6.6.4l4.2-2.8c.5.1 1 .1 1.5.1 5.5 0 10-3.6 10-8S17.5 3 12 3z" fill="#191919"/></svg>';
-  const socialHtml = (mode) => {
-    const word = mode === 'signup' ? '시작하기' : '로그인';
-    return `<div class="socialbox">${[['kakao', '카카오', KAKAO_ICON, API.on && API.social.KAKAO], ['naver', '네이버', '<b class="nmark">N</b>', API.on && API.social.NAVER]].map(([k, t, ic, on]) => (on
-      ? `<a class="soc ${k}" href="/api/auth/${k}/start">${ic}<span>${t}로 ${word}</span></a>`
-      : `<button type="button" class="soc ${k}" data-act="socialOff" data-n="${t}">${ic}<span>${t}로 ${word}</span></button>`)).join('')}</div>`;
-  };
-  const orLine = (t) => `<div class="orline"><span>${t}</span></div>`;
   function openAuth(mode, after) {
     S.pending = after || null;
     SV.phoneOk = '';
@@ -1304,7 +1294,6 @@
     openModal(`<div class="auth">
       <h2>${signup ? '회원가입' : '로그인'}</h2>
       <p class="muted authsub">${signup ? '가입하면 10,000P를 드려요.' : '로그인하고 예약과 후기를 남겨 보세요.'}</p>
-      ${signup ? `${socialHtml(mode)}${orLine('또는 이메일로 가입')}` : ''}
       <form class="aform" data-form="${mode}">
         ${f('aEmail', signup ? '이메일 (아이디)' : '이메일 (아이디)', `<input id="aEmail" type="email" placeholder="name@example.com" autocomplete="email" required>`)}
         ${f('aPw', '비밀번호', `<input id="aPw" type="password" placeholder="${signup ? '6자 이상' : '비밀번호'}" autocomplete="${signup ? 'new-password' : 'current-password'}" required minlength="6">`)}
@@ -1317,50 +1306,10 @@
         <button class="btn primary lg block">${signup ? '가입하기' : '로그인'}</button>
         ${signup ? '' : '<p class="demo">데모 계정 <b>demo@example.com</b> / <b>demo1234</b> <button type="button" class="linkbtn" data-act="fillDemo">입력하기</button></p>'}
       </form>
-      ${signup ? '' : `${orLine('또는')}${socialHtml(mode)}`}
       <p class="authfoot">${signup ? '이미 계정이 있나요?' : '아직 계정이 없나요?'} <button type="button" class="linkbtn strong" data-act="${signup ? 'login' : 'signup'}">${signup ? '로그인' : '회원가입'}</button></p>
     </div>`);
   }
 
-  // 서버 모드: 소셜로 막 가입해 휴대폰이 없는 회원은 인증을 마쳐야 예약·후기를 쓸 수 있다.
-  // 인증하면 가입 보너스를 받고, 그 번호로 이미 가입한 계정이 있으면 그 계정에 연결된다(기존 계정의 비밀번호 확인).
-  function openPhoneVerify(after) {
-    S.pending = after || null;
-    openModal(`<h2>휴대폰 인증</h2><p class="muted" style="margin:0">예약과 후기를 쓰려면 휴대폰 인증이 필요해요. 인증하면 10,000P를 드려요. 이미 이 번호로 가입한 계정이 있으면 그 계정과 연결돼요.</p>
-      <form class="form" data-form="phone">
-        <div class="phonerow"><input id="pvPhone" type="tel" inputmode="numeric" placeholder="휴대폰 번호 (010-1234-5678)" autocomplete="tel" required><button type="button" class="btn sm" data-act="pvSend">인증번호 받기</button></div>
-        <div class="phonerow"><input id="pvCode" type="text" inputmode="numeric" maxlength="6" placeholder="인증번호 6자리"><button type="button" class="btn sm" data-act="pvVerify">인증하기</button></div>
-        <input id="pvPw" type="password" placeholder="기존 계정 비밀번호" autocomplete="current-password" hidden>
-        <p class="muted" id="pvMsg" style="margin:0;font-size:13px">한 번호로 한 번만 가입할 수 있어요.</p>
-        <p class="err" id="pvErr"></p>
-      </form>`);
-  }
-  async function pvSend() {
-    const msg = $('#pvMsg'), err = $('#pvErr'); err.textContent = '';
-    try {
-      const d = await api('POST', '/api/me/phone/send', { phone: $('#pvPhone').value });
-      const pw = $('#pvPw'); pw.hidden = !d.needsPassword;
-      msg.textContent = d.existing
-        ? (d.needsPassword ? '이미 가입된 번호예요. 인증번호와 함께 그 계정의 비밀번호를 입력하면 소셜 계정이 연결돼요.' : '소셜 로그인으로만 가입한 계정의 번호예요. 지금은 연결할 수 없어요.')
-        : (d.mock ? `인증번호를 보냈어요. (모의 발송: 실제 문자는 가지 않아요. 인증번호 ${d.devCode}) 5분 안에 입력해 주세요.` : '인증번호를 보냈어요. 5분 안에 입력해 주세요.');
-      if (d.existing && d.mock) msg.textContent += ` (모의 발송 인증번호 ${d.devCode})`;
-      const c = $('#pvCode'); if (c) c.focus();
-    } catch (e) { err.textContent = e.message; }
-  }
-  async function pvVerify() {
-    const err = $('#pvErr'); err.textContent = '';
-    try {
-      const d = await api('POST', '/api/me/phone/verify', { phone: $('#pvPhone').value, code: $('#pvCode').value, password: $('#pvPw').value });
-      if (d.token) saveToken(d.token); // 기존 계정에 연결되면 로그인이 그 계정으로 바뀌므로 새 토큰으로 교체한다
-      setUser(d); clearSeatCaches(); await loadMyRes(); renderUser(); closeModal();
-      toast(d.merged ? '기존 계정에 소셜 계정을 연결했어요.' : '휴대폰 인증이 완료됐어요. 10,000P가 적립됐어요.');
-      const next = S.pending; S.pending = null;
-      if (next) next(); else route();
-    } catch (e) {
-      if (e.data && e.data.needsPassword) $('#pvPw').hidden = false;
-      err.textContent = e.message;
-    }
-  }
   // 서버 모드: 서버가 가입(휴대폰 인증·중복 확인)과 로그인을 처리한다
   async function submitAuthServer(mode, email, pw, err) {
     const digits = (s) => String(s || '').replace(/\D/g, '');
@@ -1379,7 +1328,6 @@
     renderUser(); closeModal();
     toast(mode === 'signup' ? '가입이 완료됐어요. 10,000P가 적립됐어요.' : `${me().name}님, 환영해요.`);
     const next = S.pending; S.pending = null;
-    if (SV.user && !SV.user.phoneVerified) { openPhoneVerify(next); return; }
     if (next) next(); else route();
   }
   async function submitAuth(mode) {
@@ -1659,8 +1607,6 @@
         SV.phoneOk = digits; msg.textContent = '휴대폰 인증이 완료됐어요.';
       } catch (e) { msg.textContent = e.message; }
     },
-    pvSend, pvVerify,
-    socialOff: (t) => toast(API.on ? `${t.dataset.n} 로그인은 서버에 키가 아직 설정되지 않았어요.` : `${t.dataset.n} 로그인은 서버가 연결된 환경에서만 쓸 수 있어요.`),
     resTab: (t) => { S.resTab = t.dataset.v; S.cancelId = null; showReservations(); },
     change: (t) => openChange(resById(t.dataset.id)),
     cancelAsk: (t) => { S.cancelId = Number(t.dataset.id); showReservations(); },
@@ -1700,7 +1646,6 @@
     if (k === 'login' || k === 'signup') submitAuth(k);
     else if (k === 'change') submitChange(f.dataset.id);
     else if (k === 'review') submitReview(f.dataset.id);
-    else if (k === 'phone') pvVerify();
   });
   document.addEventListener('input', (e) => { // 회원가입: 비밀번호와 비밀번호 확인이 같은지 바로 보여 준다
     if (e.target.id !== 'aPw' && e.target.id !== 'aPw2') return;
@@ -1763,15 +1708,6 @@
     $('#logoMark2').innerHTML = ico('book', 20);
     await detectServer(); // 서버가 있으면 서버 DB 모드, 없으면(정적 배포) 브라우저 저장소 모드
     if (!API.on) await seedDemo();
-    // 소셜 로그인을 마치고 돌아온 경우: 1회용 티켓을 로그인 토큰으로 바꾼다
-    const hash0 = location.hash;
-    if (API.on && hash0.startsWith('#social=')) {
-      history.replaceState(null, '', location.pathname + location.search);
-      try { const d = await api('POST', '/api/auth/exchange', { ticket: hash0.slice(8) }); saveToken(d.token); setUser(d); toast(`${d.name}님, 환영해요.`); } catch (e) { toast(e.message); }
-    } else if (hash0.startsWith('#login-error=')) {
-      history.replaceState(null, '', location.pathname + location.search);
-      toast(decodeURIComponent(hash0.slice(13)));
-    }
     renderUser();
     const ra = $('#regAsof'); if (ra) ra.textContent = window.SC_REGIONS_ASOF || '';
     try { Object.keys(localStorage).filter((k) => /^studymoa:r:v[1234]:|^studymoa:real:/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch { /* 저장소 사용 불가 */ } // 쓰지 않는 옛 저장본 정리
@@ -1795,7 +1731,6 @@
         toast('로그인 상태를 확인하지 못했어요. 잠시 뒤 다시 확인합니다.');
         window.setTimeout(recoverSession, 5000);
       }
-      if (API.on && SV.user && !SV.user.phoneVerified) openPhoneVerify(); // 소셜로 막 가입했거나 인증을 미룬 회원
     };
     if (API.restoreP) API.restoreP.finally(afterSession); else afterSession();
   }

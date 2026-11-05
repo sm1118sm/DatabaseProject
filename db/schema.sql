@@ -23,17 +23,6 @@ CREATE TABLE member (
   CONSTRAINT ck_member_point CHECK (point_balance >= 0)
 ) ENGINE=InnoDB;
 
--- 소셜 로그인 연결 (카카오·네이버). 같은 소셜 계정은 한 회원에만 연결된다.
-CREATE TABLE member_social (
-  provider         ENUM('KAKAO','NAVER') NOT NULL,
-  provider_user_id VARCHAR(64) NOT NULL,
-  member_id        BIGINT      NOT NULL,
-  linked_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (provider, provider_user_id),
-  UNIQUE KEY uq_social_member (member_id, provider),
-  CONSTRAINT fk_social_member FOREIGN KEY (member_id) REFERENCES member (member_id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
 -- 휴대폰 인증 요청 (문자 인증번호). 코드는 해시로만 저장하고 만료·시도 횟수를 제한한다.
 CREATE TABLE phone_verification (
   verify_id   BIGINT      NOT NULL AUTO_INCREMENT,
@@ -231,29 +220,6 @@ CREATE TABLE favorite (
   PRIMARY KEY (member_id, cafe_id),
   CONSTRAINT fk_fav_member FOREIGN KEY (member_id) REFERENCES member (member_id) ON DELETE CASCADE,
   CONSTRAINT fk_fav_cafe   FOREIGN KEY (cafe_id)   REFERENCES cafe (cafe_id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- 가까운 역·대학교 (거리 기준점)
-CREATE TABLE landmark (
-  landmark_id BIGINT        NOT NULL AUTO_INCREMENT,
-  region_id   BIGINT        NOT NULL,
-  kind        ENUM('STATION','UNIVERSITY') NOT NULL,
-  name        VARCHAR(60)   NOT NULL,
-  latitude    DECIMAL(10,7) NOT NULL,
-  longitude   DECIMAL(10,7) NOT NULL,
-  PRIMARY KEY (landmark_id),
-  UNIQUE KEY uq_landmark (region_id, kind, name),
-  CONSTRAINT fk_landmark_region FOREIGN KEY (region_id) REFERENCES region (region_id)
-) ENGINE=InnoDB;
-
-CREATE TABLE cafe_landmark (
-  cafe_id     BIGINT NOT NULL,
-  landmark_id BIGINT NOT NULL,
-  distance_m  INT    NOT NULL,
-  PRIMARY KEY (cafe_id, landmark_id),
-  CONSTRAINT fk_cl_cafe     FOREIGN KEY (cafe_id)     REFERENCES cafe (cafe_id) ON DELETE CASCADE,
-  CONSTRAINT fk_cl_landmark FOREIGN KEY (landmark_id) REFERENCES landmark (landmark_id) ON DELETE CASCADE,
-  CONSTRAINT ck_cl_distance CHECK (distance_m >= 0)
 ) ENGINE=InnoDB;
 
 -- 뷰: 카페별 시간당 요금과 같은 시·구 평균 대비 차이 (윈도우 함수).
