@@ -1,4 +1,4 @@
-# 스터디모아 ERD (v5)
+# 스터디픽 ERD (v5)
 
 작성일 2026-11-02, 개정 2026-11-05 · 대상: 현재 사이트(`public/app.js`)와 서버(`server/index.js`) 기능 전체 · DBMS: MySQL 8 (InnoDB)
 

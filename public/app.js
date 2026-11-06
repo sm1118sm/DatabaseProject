@@ -1,4 +1,4 @@
-// 스터디모아 프런트엔드 (운영 API + 정적 시연 모드)
+// 스터디픽 프런트엔드 (운영 API + 정적 시연 모드)
 // 비즈니스 분할도: ① 이용 옵션 선택 ② 지역 설정 ③ 스터디카페 비교·추천 ④ 고객 예약
 (() => {
   'use strict';
@@ -555,7 +555,7 @@
   function showGuide() {
     curPage = 'guide';
     const reviewBlock = recentReviews(), realCount = D.cafes.filter((c) => c.real).length;
-    view.innerHTML = pageHead('이용 안내', '이렇게 이용하세요', '스터디모아의 4단계 이용 흐름을 한눈에 확인해 보세요.')
+    view.innerHTML = pageHead('이용 안내', '이렇게 이용하세요', '스터디픽의 4단계 이용 흐름을 한눈에 확인해 보세요.')
       + `<section class="section section-tight"><div class="wrap">${flowHtml()}<div class="gd-refund"><span class="hm-fi f4">${ico('card', 22)}</span><div><b>환불 규정</b><p>시간제는 이용 1시간 전까지 <b>100% 환불</b>, 이후에는 <b>50% 환불</b>돼요. 기간제는 이용 시작 전 100% 환불돼요. 포인트로 결제했다면 같은 금액을 포인트로 돌려드려요.</p></div></div></div></section>`
       + (reviewBlock ? `<section class="section"><div class="wrap"><div class="sec-head"><div><h2>최근 이용 후기</h2><p>${realCount ? '이 사이트에서 남긴 후기' : '샘플 후기'}</p></div></div><div class="revgrid">${reviewBlock}</div></div></section>` : '')
       + `<section class="section"><div class="wrap"><div class="hm-final"><h2>준비됐다면 바로 시작해 보세요</h2><p>우리 동네 스터디카페를 평균 요금과 비교해 볼 수 있어요.</p><div class="hm-cta"><button class="btn lg hm-white" data-act="goto" data-hash="options">지금 시작하기</button></div></div></div></section>`;

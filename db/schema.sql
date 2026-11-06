@@ -1,4 +1,4 @@
--- 스터디모아 스키마 v5 (MySQL 8.0+) — ERD: db/ERD.md
+-- 스터디픽 스키마 v5 (MySQL 8.0+) — ERD: db/ERD.md
 -- 실행: npm run db:init -- --force   (studycafe DB 를 지우고 다시 만든다)
 
 DROP DATABASE IF EXISTS studycafe;

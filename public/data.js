@@ -1,4 +1,4 @@
-// 스터디모아 샘플 데이터 (가상의 카페 18곳, 실제 업체가 아님)
+// 스터디픽 샘플 데이터 (가상의 카페 18곳, 실제 업체가 아님)
 window.SC_DATA = (() => {
   const SEAT = { NORMAL: '일반석', FOCUS: '집중석', ROOM: '스터디룸' };
   const PLAN = { DAY: '1일권', WEEK: '주간권', MONTH: '월간권' };
