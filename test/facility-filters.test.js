@@ -7,7 +7,7 @@ const source = fs.readFileSync(path.join(__dirname, '../public/app.js'), 'utf8')
 
 test('regional price comparison and difference sorting survive feature removal', () => {
   const cafes = [3000, 1000, 2000].map((hourly, id) => ({ id, sido: '서울', sigungu: '강남', lat: 0, lng: 0, price: { NORMAL: { hourly } } }));
-  const context = vm.createContext({ D: { cafes }, S: { q: { sido: '서울', sigungu: '강남', sort: 'diff' } },
+  const context = vm.createContext({ API: { on: false }, D: { cafes }, S: { q: { sido: '서울', sigungu: '강남', sort: 'diff' } },
     qView: () => ({ type: 'NORMAL', mode: 'HOURLY' }), origin: () => [0, 0], dist: () => 0, isOpen: () => true, avail: () => 1, ratingOf: () => ({ avg: 0 }), won: n => n+'원' });
   vm.runInContext(source.slice(source.indexOf('  const price ='), source.indexOf('  // ---- 거리')), context);
   vm.runInContext(source.slice(source.indexOf('  const RADIUS_KM'), source.indexOf('  function avgStrip')), context);

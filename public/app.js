@@ -153,6 +153,7 @@
   }
   // 서버에 이 카페가 없으면 등록하고 서버의 카페 번호를 돌려준다 (처음 예약할 때만 저장)
   async function ensureDbCafe(c) {
+    if (API.on && c.dbId) return c.dbId;
     if (SV.dbId.has(c.id)) return SV.dbId.get(c.id);
     const d = await api('POST', '/api/cafes/ensure', { placeId: placeIdOf(c), name: c.name, address: c.addr, phone: c.phone, lat: c.lat, lng: c.lng, url: c.url, sido: c.sido, sigungu: c.sigungu, real: !!c.real, seats: c.seats, roomCap: c.roomCap, price: c.price });
     SV.dbId.set(c.id, d.cafeId);
@@ -168,12 +169,14 @@
 
   // ---- 가격 / 평균 -----------------------------------------------------------------
   const price = (c, type, mode, plan) => {
+    if (API.on && !c.dbId) return null;
     const p = c.price[type];
     if (!p) return null;
     return mode === 'HOURLY' ? p.hourly : (p[plan] ?? null);
   };
   const avgCache = new Map();
   function regionAvg(c, type, mode, plan) {
+    if (API.on) return c.regionAverages?.[type]?.[mode === 'HOURLY' ? 'hourly' : plan] ?? null;
     const k = `${c.sido}|${c.sigungu}|${type}|${mode}|${plan}`;
     if (!avgCache.has(k)) {
       const v = D.cafes.filter((x) => x.sido === c.sido && x.sigungu === c.sigungu).map((x) => price(x, type, mode, plan)).filter((x) => x != null);
@@ -685,11 +688,11 @@
     const v = qView(), q = S.q;
     const pool = q.geo ? list.map((x) => x.c) : D.cafes.filter((c) => c.sido === q.sido && c.sigungu === q.sigungu);
     if (!pool.length) return '';
-    const mean = (mode, plan) => { const a = pool.map((c) => price(c, v.type, mode, plan)).filter((x) => x != null); return a.length ? Math.round(a.reduce((s, x) => s + x, 0) / a.length) : null; };
+    const mean = (mode, plan) => { if (API.on && !q.geo) return regionAvg(pool[0], v.type, mode, plan); const a = pool.map((c) => price(c, v.type, mode, plan)).filter((x) => x != null); return a.length ? Math.round(a.reduce((s, x) => s + x, 0) / a.length) : null; };
     const items = [['시간제', mean('HOURLY')]];
     if (v.type !== 'ROOM') Object.entries(PLAN).forEach(([k, t]) => items.push([t, mean('PERIOD', k)]));
     const title = q.geo ? (q.radius ? `내 주변 ${q.radius}km 이내` : '내 주변') : q.sigungu;
-    return `<p class="avgline">${esc(title)} ${SEAT[v.type]} 평균 · ${items.filter(([, x]) => x != null).map(([t, x]) => `${t} <b>${won(x)}</b>`).join(' · ')}</p>`;
+    return `<p class="avgline">${esc(title)} ${SEAT[v.type]} 평균 · ${items.filter(([, x]) => x != null).map(([t, x]) => `${t} <b>${won(x)}</b>`).join(' · ')}${API.on ? ' · 등록 요금 기준(예시 요금 포함)' : ''}</p>`;
   }
 
   function cardHtml(it, idx) {
@@ -741,20 +744,20 @@
     const where = q.geo ? (q.radius ? `내 주변 ${q.radius}km 이내` : '내 주변') : `${q.sido} ${q.sigungu}`;
     const when = v.mode === 'HOURLY' ? `${fmtDate(v.date)} ${hh(v.start)}–${hh(v.end)}` : `${PLAN[v.plan]}`;
     const sorts = [['price', '최저가순'], ['distance', '거리순'], ['rating', '평점순'], ['diff', '평균 대비 저렴순']];
-    const loading = !!S.regionLoading, noKakao = !S.kakao && !D.cafes.some((c) => c.sido === q.sido && c.sigungu === q.sigungu);
-    const empty = loading ? `<li class="empty"><h3>카카오맵에서 ${esc(q.sigungu)} 스터디카페를 불러오는 중이에요</h3><p class="muted">처음 보는 지역은 몇 초 걸려요. 한 번 불러온 지역은 다음부터 바로 보여요.</p></li>`
+    const loading = !!S.regionLoading, noKakao = !API.on && !S.kakao && !D.cafes.some((c) => c.sido === q.sido && c.sigungu === q.sigungu);
+    const empty = loading ? `<li class="empty"><h3>${API.on ? '등록된' : '카카오맵의'} ${esc(q.sigungu)} 스터디카페를 불러오는 중이에요</h3><p class="muted">처음 보는 지역은 몇 초 걸려요. 한 번 불러온 지역은 다음부터 바로 보여요.</p></li>`
       : noKakao ? `<li class="empty"><h3>이 지역은 카카오맵 연결이 필요해요</h3><p class="muted">지도를 불러오지 못해 실제 카페 정보를 가져올 수 없어요. 잠시 뒤 다시 시도해 주세요.</p></li>`
       : nearD != null ? `<li class="empty"><h3>반경 ${q.radius}km 안에는 카페가 없어요</h3><p class="muted">가장 가까운 카페는 ${S.me || q.geo ? '내 위치' : `${esc(q.sigungu)} 중심`}에서 ${km(nearD)} 떨어져 있어요.</p>${q.geo ? (RADIUS_KM.find((k) => k >= nearD) ? `<button class="btn primary" data-act="setRadius" data-k="${RADIUS_KM.find((k) => k >= nearD)}">반경 ${RADIUS_KM.find((k) => k >= nearD)}km로 넓혀 보기</button>` : '<button class="btn primary" data-act="geo">내 위치 해제하고 지역 고르기</button>') : '<button class="btn primary" data-act="noRadius">반경 제한 없음으로 보기</button>'}</li>`
-      : `<li class="empty"><h3>조건에 맞는 스터디카페가 없어요</h3><p class="muted">${q.geo ? '내 주변에 카페가 없을 수 있어요. 지역을 직접 선택해 보세요.' : S.regionError === `${q.sido}|${q.sigungu}` ? '카카오맵에서 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.' : '이 지역에는 카카오맵에 등록된 스터디카페가 없거나, 조건에 맞는 곳이 없어요.'}</p><button class="btn primary" data-act="reset">조건 초기화</button></li>`;
+      : `<li class="empty"><h3>조건에 맞는 스터디카페가 없어요</h3><p class="muted">${q.geo ? '내 주변에 카페가 없을 수 있어요. 지역을 직접 선택해 보세요.' : S.regionError === `${q.sido}|${q.sigungu}` ? '카페 정보를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.' : '이 지역에는 등록된 요금이 없거나, 조건에 맞는 스터디카페가 없어요.'}</p><button class="btn primary" data-act="${S.regionError ? 'retryRegion' : 'reset'}">${S.regionError ? '다시 불러오기' : '조건 초기화'}</button></li>`;
     const hlIdx = list.findIndex((it) => it.c.id === S.hl);
     if (hlIdx >= S.limit) S.limit = hlIdx + 1; // 지도에서 고른 카페가 목록에 보이도록 목록을 그 위치까지 펼친다
     const shown = list.slice(0, S.limit);
-    const realNote = S.regionLoading ? `<p class="note" style="margin-bottom:12px">카카오맵에서 ${esc(q.sigungu)} 스터디카페를 불러오는 중이에요…</p>`
+    const realNote = S.regionLoading ? `<p class="note" style="margin-bottom:12px">${API.on ? '등록된' : '카카오맵의'} ${esc(q.sigungu)} 스터디카페를 불러오는 중이에요…</p>`
       : '';
     const why = { denied: '위치 권한이 꺼져 있어', unavailable: '현재 위치를 확인하지 못해', abroad: '내 위치 주변에서 지역 정보를 찾지 못해', unsupported: '이 브라우저에서는 위치 기능을 쓸 수 없어' }[S.locFail];
     const locNote = !S.me && why ? `<div class="locnote"><span>${why} <b>${esc(q.sido)} ${esc(q.sigungu)}</b> 기준으로 보여드려요.</span><span class="locbtns">${['denied', 'unavailable'].includes(S.locFail) ? '<button class="btn sm" data-act="locHelp">위치 허용 방법</button>' : ''}${S.locFail !== 'unsupported' ? '<button class="btn sm" data-act="locRetry">다시 시도</button>' : ''}<button class="btn sm" data-act="goArea">지역 직접 선택</button></span></div>` : '';
     const t0 = !q.geo && S.regionTime.get(regKey(regionOf()));
-    const asof = t0 && realMode() ? `카카오맵 ${ago(t0)} 기준` : '';
+    const asof = t0 && realMode() ? `${API.on ? '등록 요금' : '카카오맵'} ${ago(t0)} 기준` : '';
     const regionChips = `<div class="chips regionchips" role="group" aria-label="지역 바로 선택">${D.quick.map(([sd, sg]) => `<button class="chip" data-act="region" data-s="${esc(sd)}" data-g="${esc(sg)}" aria-pressed="${!q.geo && q.sido === sd && q.sigungu === sg}">${esc(sg)}</button>`).join('')}</div>`;
     const ratingNote = list.some((it) => it.r.demo) ? '<p class="note">과제 시연용 평점·후기 포함</p>' : '';
     box.innerHTML = `${locNote}${realNote}${ratingNote}${avgStrip(list)}
@@ -1010,9 +1013,63 @@
     });
     return list;
   }
-  // 고른 시·군·구의 실제 카페를 불러온다. 이미 본 구는 저장된 결과를 쓴다. (같은 구를 동시에 두 번 검색하지 않는다)
+  // 운영 모드에서는 저장된 카카오 결과로 요금을 복원하지 않고 DB 등록 요금·좌석을 조회한다.
+  const enrichedRegions = new Set();
+  function catalogCafe(row, previous) {
+    const c = fromPlace({ id: row.kakao_place_id, place_name: row.name, road_address_name: row.address,
+      y: row.latitude, x: row.longitude, phone: row.phone, place_url: row.place_url }, row);
+    c.dbId = row.cafe_id;
+    c.price = {}; c.regionAverages = {}; c.priceSources = {};
+    const units = { HOURLY: 'hourly', DAILY: 'DAY', WEEKLY: 'WEEK', MONTHLY: 'MONTH' };
+    for (const p of row.plans) {
+      const k = units[p.plan_type]; if (!k) continue;
+      (c.price[p.code] ||= {})[k] = p.price;
+      (c.regionAverages[p.code] ||= {})[k] = p.region_avg_price;
+      (c.priceSources[p.code] ||= {})[k] = p.price_source;
+    }
+    c.seats = { NORMAL: 0, FOCUS: 0, ROOM: 0 }; c.roomCap = 0;
+    for (const s of row.seats) { c.seats[s.code] = s.total; if (s.code === 'ROOM') c.roomCap = s.capacity; }
+    c.open = Number(row.open_time.slice(0, 2));
+    c.close = row.close_time >= '23:59:59' ? 24 : Number(row.close_time.slice(0, 2));
+    c.station = previous?.station || null; c.univ = previous?.univ || null;
+    return c;
+  }
+  async function enrichDbRegion(reg) {
+    const key = regKey(reg);
+    if (!S.kakao || enrichedRegions.has(key)) return;
+    enrichedRegions.add(key);
+    try {
+      const list = readRegionCache(reg) || await scanRegion(reg);
+      const byId = new Map(list.map((c) => [c.id, c]));
+      for (const c of D.cafes.filter((c) => regKey(c) === key)) {
+        const near = byId.get(c.id); if (near) { c.station = near.station; c.univ = near.univ; }
+      }
+    } catch { enrichedRegions.delete(key); /* 지도가 실패해도 DB 요금과 예약은 유지 */ }
+  }
+  async function loadDbRegion(reg) {
+    const key = regKey(reg);
+    const rows = await api('GET', `/api/cafes/catalog?${new URLSearchParams({ sido: reg.sido, sigungu: reg.sigungu })}`);
+    if (!Array.isArray(rows)) throw Error('카페 정보를 불러오지 못했어요.');
+    const previous = new Map((readRegionCache(reg) || []).map((c) => [c.id, c]));
+    const cafes = rows.map((row) => catalogCafe(row, previous.get(Number(row.kakao_place_id))));
+    for (let i = D.cafes.length - 1; i >= 0; i--) if (regKey(D.cafes[i]) === key) D.cafes.splice(i, 1);
+    D.cafes.push(...cafes); avgCache.clear();
+    S.regionTime.set(key, Date.now()); S.regionError = null;
+    enrichDbRegion(reg).finally(() => onRealLoaded());
+  }
+  // 고른 시·군·구의 실제 카페를 불러온다. 같은 지역의 동시 조회는 합친다.
   function ensureRegion(reg) {
     const key = regKey(reg);
+    if (API.on) {
+      if (S.inflight.has(key)) return S.inflight.get(key);
+      if (S.regionDone.has(key)) return enrichDbRegion(reg);
+      S.regionLoading = key;
+      const pending = loadDbRegion(reg).then(() => S.regionDone.add(key)).catch(() => { S.regionError = key; }).finally(() => {
+        S.inflight.delete(key); if (S.regionLoading === key) S.regionLoading = null;
+        onRealLoaded();
+      });
+      S.inflight.set(key, pending); return pending;
+    }
     if (S.regionDone.has(key)) return Promise.resolve();
     const cached = readRegionCache(reg);
     if (cached) { applyRegion(reg, cached); S.regionDone.add(key); return Promise.resolve(); }
@@ -1106,9 +1163,16 @@
     return '';
   }
 
-  function showCafe(id) {
-    const c = cafeById(id);
+  async function showCafe(id) {
+    let c = cafeById(id);
     if (!c) { location.hash = 'home'; return; }
+    if (API.on && !c.dbId) {
+      view.innerHTML = '<div class="wrap"><p>카페 요금을 불러오는 중이에요…</p></div>';
+      await ensureRegion(c);
+      if (location.hash !== `#cafe-${id}`) return;
+      c = cafeById(id);
+      if (!c?.dbId) { view.innerHTML = '<div class="wrap"><p>등록된 요금을 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.</p></div>'; return; }
+    }
     initBook(c);
     const r = ratingOf(c);
     const q = S.q;
@@ -1258,7 +1322,7 @@
     const reset = () => { btn.disabled = false; btn.textContent = `${won(total)} 결제하기`; };
     try {
       const cafeId = await ensureDbCafe(c);
-      const d = await api('POST', '/api/reservations', { cafeId, seatLabel: seatLabel(b.seat, b.type), mode: b.mode, date: b.date, startHour: b.start, hours: b.end - b.start, plan: b.plan, method });
+      const d = await api('POST', '/api/reservations', { cafeId, seatLabel: seatLabel(b.seat, b.type), mode: b.mode, date: b.date, startHour: b.start, hours: b.end - b.start, plan: b.plan, method, quotedTotal: total });
       SV.user.points = d.pointBalance; clearSeatCaches();
       await loadMyRes(); renderUser();
       const r = SV.res.find((x) => x.id === d.reservationId) || { id: d.reservationId, type: b.type, seat: b.seat, mode: b.mode, plan: b.plan, date: b.date, start: b.start, end: b.end };
@@ -1266,7 +1330,8 @@
       showReceipt(r, c, method, d.totalPrice);
       refreshBook();
     } catch (e) {
-      $('#payErr').textContent = e.status === 409 ? '방금 다른 분이 이 좌석을 예약했어요. 좌석을 다시 선택해 주세요.' : e.message;
+      $('#payErr').textContent = e.status === 409 && !/요금/.test(e.message) ? '방금 다른 분이 이 좌석을 예약했어요. 좌석을 다시 선택해 주세요.' : e.message;
+      if (/요금이 변경/.test(e.message)) { S.regionDone.delete(regKey(c)); await ensureRegion(c); }
       if (e.status === 409) { clearSeatCaches(); refreshBook(); }
       reset();
     }
@@ -1467,6 +1532,7 @@
   const afterQuery = () => { S.limit = PAGE; refreshPanel(); refreshCats(); renderResults(); };
   const onRealLoaded = () => { refreshPanel(); refreshCats(); refreshMaps(); };
   const ACT = {
+    retryRegion: () => { S.regionDone.delete(regKey(regionOf())); ensureRegion(regionOf()).finally(onRealLoaded); renderResults(); },
     home: (t, e) => { e.preventDefault(); location.hash = 'home'; if (!$('#panel')) return; window.scrollTo(0, 0); },
     goto: (t) => {
       const h = t.dataset.hash;
@@ -1699,6 +1765,7 @@
     $('#logoMark').innerHTML = ico('book', 20);
     $('#logoMark2').innerHTML = ico('book', 20);
     await detectServer(); // 서버가 있으면 서버 DB 모드, 없으면(정적 배포) 브라우저 저장소 모드
+    if (API.on) D.cafes.splice(0); // 운영 화면에는 정적 예시 카페·생성 요금을 섞지 않는다.
     if (!API.on) await seedDemo();
     renderUser();
     const ra = $('#regAsof'); if (ra) ra.textContent = window.SC_REGIONS_ASOF || '';

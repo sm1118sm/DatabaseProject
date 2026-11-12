@@ -8,6 +8,7 @@ const { wakeStatus } = require('./wake-db');
 const retryTransaction = require('./retry-transaction');
 const hasReservationOverlap = require('./reservation-overlap');
 const listAvailability = require('./list-availability');
+const cafeCatalog = require('./cafe-catalog');
 
 const app = express();
 app.use(express.json({ limit: '200kb' }));
@@ -220,6 +221,13 @@ app.get('/api/me', auth, wrap(async (req, res) => {
 // ---- 카페 목록 (시·구 평균 대비) ------------------------------------------
 // 좌석 유형별 시간당 요금을 같은 시·구 평균과 비교한다.
 // 평균은 사람이 확인한 요금(VERIFIED)만으로 계산한다. 예시 요금(EXAMPLE)인 카페는 목록에는 나오되 평균 비교(diff)는 null 이다.
+app.get('/api/cafes/catalog', wrap(async (req, res) => {
+  const sido = String(req.query.sido || ''), sigungu = String(req.query.sigungu || '');
+  if (!sido || !sigungu || sido.length > 50 || sigungu.length > 50) return res.status(400).json({ error: '시·도와 시·군·구를 선택해 주세요.' });
+  res.set('Cache-Control', 'no-store');
+  res.json(await cafeCatalog(pool, { sido, sigungu }));
+}));
+
 app.get('/api/cafes', wrap(async (req, res) => {
   const { sido, sigungu } = req.query;
   const legacy = { SEAT: 'NORMAL' }[req.query.roomType]; // 옛 파라미터(roomType=SEAT) 호환
@@ -462,6 +470,10 @@ app.post('/api/reservations', auth, requireVerified, bookingWrap(async (req, res
       'SELECT price FROM price_plan WHERE cafe_id = ? AND seat_type_id = ? AND plan_type = ?', [seat.cafe_id, seat.seat_type_id, span.unit]);
     if (!plan) { await conn.rollback(); return res.status(400).json({ error: '해당 이용권 요금이 등록되지 않았습니다.' }); }
     const total = span.unit === 'HOURLY' ? plan.price * span.hrs : plan.price;
+    if (b.quotedTotal != null && Number(b.quotedTotal) !== total) {
+      await conn.rollback();
+      return res.status(409).json({ code: 'PRICE_CHANGED', error: '요금이 변경됐어요. 최신 요금을 확인한 뒤 다시 예약해 주세요.' });
+    }
 
     if (span.unit === 'HOURLY') {
       const closeClock = seat.close_time >= '23:59:59' ? 24 : Number(String(seat.close_time).slice(0, 2));
