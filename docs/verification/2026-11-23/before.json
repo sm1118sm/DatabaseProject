@@ -1,0 +1,247 @@
+{
+  "checkedAt": "2026-11-23T05:18:25.842Z",
+  "database": "defaultdb",
+  "readOnly": true,
+  "schema": {
+    "tables": [
+      "cafe",
+      "member",
+      "payment",
+      "phone_verification",
+      "point_history",
+      "price_plan",
+      "region",
+      "reservation",
+      "reservation_slot",
+      "review",
+      "seat",
+      "seat_type"
+    ],
+    "columnCount": 84,
+    "primaryKeys": 12,
+    "uniqueKeys": 9,
+    "foreignKeys": 15,
+    "noCollectionTypes": true,
+    "cafeDoesNotRepeatRegionName": true,
+    "pricePlanDoesNotRepeatCafeName": true,
+    "seatDoesNotRepeatTypeName": true,
+    "keys": [
+      {
+        "table_name": "cafe",
+        "name": "PRIMARY",
+        "cols": "cafe_id"
+      },
+      {
+        "table_name": "cafe",
+        "name": "uq_cafe_kakao",
+        "cols": "kakao_place_id"
+      },
+      {
+        "table_name": "member",
+        "name": "PRIMARY",
+        "cols": "member_id"
+      },
+      {
+        "table_name": "member",
+        "name": "uq_member_email",
+        "cols": "email"
+      },
+      {
+        "table_name": "member",
+        "name": "uq_member_phone",
+        "cols": "phone"
+      },
+      {
+        "table_name": "payment",
+        "name": "PRIMARY",
+        "cols": "payment_id"
+      },
+      {
+        "table_name": "payment",
+        "name": "uq_payment_resv",
+        "cols": "reservation_id"
+      },
+      {
+        "table_name": "phone_verification",
+        "name": "PRIMARY",
+        "cols": "verify_id"
+      },
+      {
+        "table_name": "point_history",
+        "name": "PRIMARY",
+        "cols": "point_id"
+      },
+      {
+        "table_name": "price_plan",
+        "name": "PRIMARY",
+        "cols": "plan_id"
+      },
+      {
+        "table_name": "price_plan",
+        "name": "uq_price_plan",
+        "cols": "cafe_id,seat_type_id,plan_type"
+      },
+      {
+        "table_name": "region",
+        "name": "PRIMARY",
+        "cols": "region_id"
+      },
+      {
+        "table_name": "region",
+        "name": "uq_region",
+        "cols": "sido,sigungu"
+      },
+      {
+        "table_name": "reservation",
+        "name": "PRIMARY",
+        "cols": "reservation_id"
+      },
+      {
+        "table_name": "reservation_slot",
+        "name": "PRIMARY",
+        "cols": "seat_id,slot_start"
+      },
+      {
+        "table_name": "review",
+        "name": "PRIMARY",
+        "cols": "review_id"
+      },
+      {
+        "table_name": "review",
+        "name": "uq_review_resv",
+        "cols": "reservation_id"
+      },
+      {
+        "table_name": "seat",
+        "name": "PRIMARY",
+        "cols": "seat_id"
+      },
+      {
+        "table_name": "seat",
+        "name": "uq_seat_label",
+        "cols": "cafe_id,label"
+      },
+      {
+        "table_name": "seat_type",
+        "name": "PRIMARY",
+        "cols": "seat_type_id"
+      },
+      {
+        "table_name": "seat_type",
+        "name": "uq_seat_type_code",
+        "cols": "code"
+      }
+    ]
+  },
+  "checks": {
+    "duplicateMemberEmail": 0,
+    "duplicateRegions": 0,
+    "duplicatePricePlans": 0,
+    "duplicateSeatLabels": 0,
+    "duplicateSeatTimeSlots": 0,
+    "duplicateReservationStartSlots": 0,
+    "slotReservationSeatMismatchRows": 49560,
+    "slotReservationsWithMultipleSeats": 0,
+    "paidAmountMismatch": 0,
+    "linkedReviewMismatch": 0,
+    "pointBalanceMismatchMembers": 1
+  },
+  "orphanForeignKeys": [
+    {
+      "table": "cafe",
+      "column": "region_id",
+      "target": "region",
+      "missing": 0
+    },
+    {
+      "table": "payment",
+      "column": "reservation_id",
+      "target": "reservation",
+      "missing": 0
+    },
+    {
+      "table": "point_history",
+      "column": "member_id",
+      "target": "member",
+      "missing": 0
+    },
+    {
+      "table": "point_history",
+      "column": "reservation_id",
+      "target": "reservation",
+      "missing": 0
+    },
+    {
+      "table": "price_plan",
+      "column": "cafe_id",
+      "target": "cafe",
+      "missing": 0
+    },
+    {
+      "table": "price_plan",
+      "column": "seat_type_id",
+      "target": "seat_type",
+      "missing": 0
+    },
+    {
+      "table": "reservation",
+      "column": "member_id",
+      "target": "member",
+      "missing": 0
+    },
+    {
+      "table": "reservation",
+      "column": "seat_id",
+      "target": "seat",
+      "missing": 0
+    },
+    {
+      "table": "reservation_slot",
+      "column": "reservation_id",
+      "target": "reservation",
+      "missing": 0
+    },
+    {
+      "table": "reservation_slot",
+      "column": "seat_id",
+      "target": "seat",
+      "missing": 0
+    },
+    {
+      "table": "review",
+      "column": "cafe_id",
+      "target": "cafe",
+      "missing": 0
+    },
+    {
+      "table": "review",
+      "column": "member_id",
+      "target": "member",
+      "missing": 0
+    },
+    {
+      "table": "review",
+      "column": "reservation_id",
+      "target": "reservation",
+      "missing": 0
+    },
+    {
+      "table": "seat",
+      "column": "cafe_id",
+      "target": "cafe",
+      "missing": 0
+    },
+    {
+      "table": "seat",
+      "column": "seat_type_id",
+      "target": "seat_type",
+      "missing": 0
+    }
+  ],
+  "orphanCount": 0,
+  "slotMismatchDetail": {
+    "reservations": 295,
+    "first_slot": "2026-11-03 00:00:00",
+    "last_slot": "2026-11-09 23:00:00"
+  }
+}

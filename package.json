@@ -9,7 +9,8 @@
     "db:init": "node scripts/init-db.js",
     "collect": "node scripts/collect-kakao.js",
     "db:import": "node scripts/import-cafes.js",
-    "check:model": "node scripts/check-model.cjs"
+    "check:model": "node scripts/check-model.cjs",
+    "check:consistency": "node scripts/check-consistency.cjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

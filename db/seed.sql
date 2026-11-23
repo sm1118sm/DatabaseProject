@@ -14,6 +14,12 @@ INSERT INTO member (email, password_hash, name, phone, phone_verified, point_bal
   ('demo@example.com',  '__DEMO_HASH__', '데모유저', '01011111111', TRUE, 5000),
   ('minji@example.com', '__DEMO_HASH__', '김민지',   '01022222222', TRUE, 0);
 
+-- 초기 잔액도 포인트 내역에 기록하여 잔액 = 변동액 합계를 유지한다.
+INSERT INTO point_history (member_id, delta, reason)
+SELECT member_id, point_balance, '시드 초기 지급 포인트'
+FROM member
+WHERE email = 'demo@example.com' AND point_balance > 0;
+
 -- 샘플 카페 4곳 (가상) -----------------------------------------------------
 INSERT INTO cafe (region_id, name, address, phone, latitude, longitude, info_source)
 SELECT r.region_id, t.name, t.address, t.phone, t.lat, t.lng, 'MANUAL'

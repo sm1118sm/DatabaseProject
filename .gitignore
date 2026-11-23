@@ -4,3 +4,6 @@ node_modules/
 !.env.example
 
 .vercel
+
+# Database repair snapshots may contain private data.
+/backups/

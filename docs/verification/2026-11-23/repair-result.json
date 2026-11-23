@@ -1,0 +1,25 @@
+{
+  "success": true,
+  "committedAt": "2026-11-23T05:39:54.327Z",
+  "database": "defaultdb",
+  "slots": {
+    "corrected": 49560,
+    "reservations": 295,
+    "totalBefore": 50409,
+    "totalAfter": 50409,
+    "mismatchAfter": 0
+  },
+  "points": {
+    "member_id": 1,
+    "balanceBefore": 5294,
+    "balanceAfter": 5294,
+    "historyBefore": 294,
+    "historyAfter": 5294,
+    "restoredInitialCredit": 5000,
+    "insertedPointId": 636,
+    "reason": "[정합성 보정] 시드 초기 지급 포인트 5,000P 내역 복원",
+    "mismatchMembersAfter": 0
+  },
+  "backupCreated": true,
+  "scope": "DB schema and SQL data consistency only"
+}
