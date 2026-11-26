@@ -10,7 +10,9 @@
     "collect": "node scripts/collect-kakao.js",
     "db:import": "node scripts/import-cafes.js",
     "check:model": "node scripts/check-model.cjs",
-    "check:consistency": "node scripts/check-consistency.cjs"
+    "check:consistency": "node scripts/check-consistency.cjs",
+    "docs:design": "node scripts/build-design-docs.cjs",
+    "check:design": "node scripts/build-design-docs.cjs --check"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

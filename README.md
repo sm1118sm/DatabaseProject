@@ -52,6 +52,11 @@ npm start              # http://localhost:3000
 
 ## DB 정합성 검사와 보정 기록
 
+- [역정규화 검토](docs/DENORMALIZATION.md): 집계값 중복 저장·무결성을 위한 중복·과거 금액 보존을 구분합니다.
+- [물리적 설계서](docs/PHYSICAL_DESIGN.md): 강의 431쪽 양식으로 12개 테이블의 84개 속성, 기본값·키·제약·인덱스·참조 동작을 정리합니다.
+- 웹에서 보기: [역정규화·물리적 설계서](https://studycafe-tan.vercel.app/design/). 기존 `/erd/`에서도 연결됩니다.
+- `npm run docs:design`: 현재 SQL·ERD 모델에서 명세를 재생성합니다. `npm run check:design`은 생성 파일과 SQL·ERD의 일치를 확인하며 DB에 접속하지 않습니다.
+
 - [2026-11-23 보정·재검증 기록](docs/CONSISTENCY_REPAIR_20261123.md): 예약 시간대 49,560행과 초기 지급 포인트 누락을 보정한 절차 및 수정 전·후 SQL 결과입니다.
 - `npm run check:consistency -- --database defaultdb`: 설정된 DB에 읽기 전용 SQL 검사를 실행합니다. 결과 저장은 `--output <파일>`을 지정합니다.
 - 과거 보정 스크립트는 자동 실행하지 않으며, 원본 백업과 접속 인증 정보는 Git에 포함하지 않습니다.

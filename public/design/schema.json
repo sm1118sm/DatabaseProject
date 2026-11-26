@@ -1,0 +1,1173 @@
+{
+  "documentDate": "2026-11-26",
+  "schemaSha256": "089096561f75c62c79a12d5b01d96f41644e45e40114bd4accae9d083dc87f7f",
+  "counts": {
+    "tables": 12,
+    "columns": 84,
+    "primaryKeys": 12,
+    "foreignKeys": 15,
+    "uniqueKeys": 9,
+    "checks": 10,
+    "explicitSecondaryIndexes": 17
+  },
+  "tables": [
+    {
+      "name": "member",
+      "label": "회원",
+      "rows": [
+        [
+          "member_id",
+          "BIGINT",
+          "N",
+          "-",
+          "PK",
+          "-",
+          "AUTO_INCREMENT"
+        ],
+        [
+          "email",
+          "VARCHAR(100)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "uq_member_email (email)"
+        ],
+        [
+          "password_hash",
+          "VARCHAR(255)",
+          "Y",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "name",
+          "VARCHAR(50)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "phone",
+          "VARCHAR(20)",
+          "Y",
+          "-",
+          "-",
+          "-",
+          "uq_member_phone (phone)"
+        ],
+        [
+          "phone_verified",
+          "BOOLEAN",
+          "N",
+          "FALSE",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "point_balance",
+          "INT",
+          "N",
+          "0",
+          "-",
+          "-",
+          "ck_member_point"
+        ],
+        [
+          "created_at",
+          "DATETIME",
+          "N",
+          "CURRENT_TIMESTAMP",
+          "-",
+          "-",
+          "-"
+        ]
+      ],
+      "pk": [
+        "member_id"
+      ],
+      "fks": [],
+      "indexes": [
+        {
+          "name": "uq_member_email",
+          "unique": true,
+          "cols": "email"
+        },
+        {
+          "name": "uq_member_phone",
+          "unique": true,
+          "cols": "phone"
+        }
+      ],
+      "checks": [
+        {
+          "name": "ck_member_point",
+          "expression": "point_balance >= 0"
+        }
+      ]
+    },
+    {
+      "name": "phone_verification",
+      "label": "휴대폰 인증",
+      "rows": [
+        [
+          "verify_id",
+          "BIGINT",
+          "N",
+          "-",
+          "PK",
+          "-",
+          "AUTO_INCREMENT"
+        ],
+        [
+          "phone",
+          "VARCHAR(20)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "code_hash",
+          "VARCHAR(64)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "attempts",
+          "TINYINT",
+          "N",
+          "0",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "expires_at",
+          "DATETIME",
+          "N",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "verified_at",
+          "DATETIME",
+          "Y",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "created_at",
+          "DATETIME",
+          "N",
+          "CURRENT_TIMESTAMP",
+          "-",
+          "-",
+          "-"
+        ]
+      ],
+      "pk": [
+        "verify_id"
+      ],
+      "fks": [],
+      "indexes": [
+        {
+          "name": "idx_pv_phone",
+          "unique": false,
+          "cols": "phone, created_at"
+        }
+      ],
+      "checks": []
+    },
+    {
+      "name": "region",
+      "label": "지역",
+      "rows": [
+        [
+          "region_id",
+          "BIGINT",
+          "N",
+          "-",
+          "PK",
+          "-",
+          "AUTO_INCREMENT"
+        ],
+        [
+          "sido",
+          "VARCHAR(20)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "uq_region (sido, sigungu)"
+        ],
+        [
+          "sigungu",
+          "VARCHAR(30)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "uq_region (sido, sigungu)"
+        ],
+        [
+          "center_lat",
+          "DECIMAL(10,7)",
+          "Y",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "center_lng",
+          "DECIMAL(10,7)",
+          "Y",
+          "-",
+          "-",
+          "-",
+          "-"
+        ]
+      ],
+      "pk": [
+        "region_id"
+      ],
+      "fks": [],
+      "indexes": [
+        {
+          "name": "uq_region",
+          "unique": true,
+          "cols": "sido, sigungu"
+        }
+      ],
+      "checks": []
+    },
+    {
+      "name": "cafe",
+      "label": "카페",
+      "rows": [
+        [
+          "cafe_id",
+          "BIGINT",
+          "N",
+          "-",
+          "PK",
+          "-",
+          "AUTO_INCREMENT"
+        ],
+        [
+          "kakao_place_id",
+          "VARCHAR(30)",
+          "Y",
+          "-",
+          "-",
+          "-",
+          "uq_cafe_kakao (kakao_place_id)"
+        ],
+        [
+          "region_id",
+          "BIGINT",
+          "N",
+          "-",
+          "-",
+          "region.region_id",
+          "-"
+        ],
+        [
+          "name",
+          "VARCHAR(100)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "address",
+          "VARCHAR(200)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "phone",
+          "VARCHAR(20)",
+          "Y",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "latitude",
+          "DECIMAL(10,7)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "longitude",
+          "DECIMAL(10,7)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "place_url",
+          "VARCHAR(200)",
+          "Y",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "open_time",
+          "TIME",
+          "N",
+          "'00:00:00'",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "close_time",
+          "TIME",
+          "N",
+          "'23:59:59'",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "info_source",
+          "ENUM('KAKAO','MANUAL')",
+          "N",
+          "'KAKAO'",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "fetched_at",
+          "DATETIME",
+          "Y",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "is_active",
+          "BOOLEAN",
+          "N",
+          "TRUE",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "created_at",
+          "DATETIME",
+          "N",
+          "CURRENT_TIMESTAMP",
+          "-",
+          "-",
+          "-"
+        ]
+      ],
+      "pk": [
+        "cafe_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_cafe_region",
+          "col": "region_id",
+          "target": "region.region_id",
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "uq_cafe_kakao",
+          "unique": true,
+          "cols": "kakao_place_id"
+        },
+        {
+          "name": "idx_cafe_region",
+          "unique": false,
+          "cols": "region_id"
+        }
+      ],
+      "checks": []
+    },
+    {
+      "name": "seat_type",
+      "label": "좌석 유형",
+      "rows": [
+        [
+          "seat_type_id",
+          "TINYINT",
+          "N",
+          "-",
+          "PK",
+          "-",
+          "AUTO_INCREMENT"
+        ],
+        [
+          "code",
+          "VARCHAR(20)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "uq_seat_type_code (code)"
+        ],
+        [
+          "name",
+          "VARCHAR(30)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "is_room",
+          "BOOLEAN",
+          "N",
+          "FALSE",
+          "-",
+          "-",
+          "-"
+        ]
+      ],
+      "pk": [
+        "seat_type_id"
+      ],
+      "fks": [],
+      "indexes": [
+        {
+          "name": "uq_seat_type_code",
+          "unique": true,
+          "cols": "code"
+        }
+      ],
+      "checks": []
+    },
+    {
+      "name": "seat",
+      "label": "좌석",
+      "rows": [
+        [
+          "seat_id",
+          "BIGINT",
+          "N",
+          "-",
+          "PK",
+          "-",
+          "AUTO_INCREMENT"
+        ],
+        [
+          "cafe_id",
+          "BIGINT",
+          "N",
+          "-",
+          "-",
+          "cafe.cafe_id",
+          "uq_seat_label (cafe_id, label)"
+        ],
+        [
+          "seat_type_id",
+          "TINYINT",
+          "N",
+          "-",
+          "-",
+          "seat_type.seat_type_id",
+          "-"
+        ],
+        [
+          "label",
+          "VARCHAR(50)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "uq_seat_label (cafe_id, label)"
+        ],
+        [
+          "capacity",
+          "INT",
+          "N",
+          "1",
+          "-",
+          "-",
+          "ck_seat_capacity"
+        ]
+      ],
+      "pk": [
+        "seat_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_seat_cafe",
+          "col": "cafe_id",
+          "target": "cafe.cafe_id",
+          "onDelete": "CASCADE",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_seat_type",
+          "col": "seat_type_id",
+          "target": "seat_type.seat_type_id",
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "uq_seat_label",
+          "unique": true,
+          "cols": "cafe_id, label"
+        },
+        {
+          "name": "idx_seat_type",
+          "unique": false,
+          "cols": "seat_type_id"
+        }
+      ],
+      "checks": [
+        {
+          "name": "ck_seat_capacity",
+          "expression": "capacity > 0"
+        }
+      ]
+    },
+    {
+      "name": "price_plan",
+      "label": "요금제",
+      "rows": [
+        [
+          "plan_id",
+          "BIGINT",
+          "N",
+          "-",
+          "PK",
+          "-",
+          "AUTO_INCREMENT"
+        ],
+        [
+          "cafe_id",
+          "BIGINT",
+          "N",
+          "-",
+          "-",
+          "cafe.cafe_id",
+          "uq_price_plan (cafe_id, seat_type_id, plan_type)"
+        ],
+        [
+          "seat_type_id",
+          "TINYINT",
+          "N",
+          "-",
+          "-",
+          "seat_type.seat_type_id",
+          "uq_price_plan (cafe_id, seat_type_id, plan_type)"
+        ],
+        [
+          "plan_type",
+          "ENUM('HOURLY','DAILY','WEEKLY','MONTHLY')",
+          "N",
+          "-",
+          "-",
+          "-",
+          "uq_price_plan (cafe_id, seat_type_id, plan_type)"
+        ],
+        [
+          "price",
+          "INT",
+          "N",
+          "-",
+          "-",
+          "-",
+          "ck_plan_price"
+        ],
+        [
+          "price_source",
+          "ENUM('EXAMPLE','VERIFIED')",
+          "N",
+          "'EXAMPLE'",
+          "-",
+          "-",
+          "ck_plan_verified"
+        ],
+        [
+          "source_note",
+          "VARCHAR(200)",
+          "Y",
+          "-",
+          "-",
+          "-",
+          "ck_plan_verified"
+        ],
+        [
+          "verified_at",
+          "DATE",
+          "Y",
+          "-",
+          "-",
+          "-",
+          "ck_plan_verified"
+        ]
+      ],
+      "pk": [
+        "plan_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_plan_cafe",
+          "col": "cafe_id",
+          "target": "cafe.cafe_id",
+          "onDelete": "CASCADE",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_plan_type",
+          "col": "seat_type_id",
+          "target": "seat_type.seat_type_id",
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "uq_price_plan",
+          "unique": true,
+          "cols": "cafe_id, seat_type_id, plan_type"
+        }
+      ],
+      "checks": [
+        {
+          "name": "ck_plan_price",
+          "expression": "price >= 0"
+        },
+        {
+          "name": "ck_plan_verified",
+          "expression": "price_source = 'EXAMPLE' OR (source_note IS NOT NULL AND verified_at IS NOT NULL)"
+        }
+      ]
+    },
+    {
+      "name": "reservation",
+      "label": "예약",
+      "rows": [
+        [
+          "reservation_id",
+          "BIGINT",
+          "N",
+          "-",
+          "PK",
+          "-",
+          "AUTO_INCREMENT"
+        ],
+        [
+          "member_id",
+          "BIGINT",
+          "N",
+          "-",
+          "-",
+          "member.member_id",
+          "-"
+        ],
+        [
+          "seat_id",
+          "BIGINT",
+          "N",
+          "-",
+          "-",
+          "seat.seat_id",
+          "-"
+        ],
+        [
+          "start_at",
+          "DATETIME",
+          "N",
+          "-",
+          "-",
+          "-",
+          "ck_resv_time"
+        ],
+        [
+          "end_at",
+          "DATETIME",
+          "N",
+          "-",
+          "-",
+          "-",
+          "ck_resv_time"
+        ],
+        [
+          "status",
+          "ENUM('CONFIRMED','CANCELED','COMPLETED','NO_SHOW')",
+          "N",
+          "'CONFIRMED'",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "total_price",
+          "INT",
+          "N",
+          "-",
+          "-",
+          "-",
+          "ck_resv_price"
+        ],
+        [
+          "created_at",
+          "DATETIME",
+          "N",
+          "CURRENT_TIMESTAMP",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "updated_at",
+          "DATETIME",
+          "N",
+          "CURRENT_TIMESTAMP",
+          "-",
+          "-",
+          "ON UPDATE CURRENT_TIMESTAMP"
+        ]
+      ],
+      "pk": [
+        "reservation_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_resv_member",
+          "col": "member_id",
+          "target": "member.member_id",
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_resv_seat",
+          "col": "seat_id",
+          "target": "seat.seat_id",
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_resv_member",
+          "unique": false,
+          "cols": "member_id, start_at"
+        },
+        {
+          "name": "idx_resv_seat_time",
+          "unique": false,
+          "cols": "seat_id, start_at, end_at"
+        }
+      ],
+      "checks": [
+        {
+          "name": "ck_resv_time",
+          "expression": "end_at > start_at"
+        },
+        {
+          "name": "ck_resv_price",
+          "expression": "total_price >= 0"
+        }
+      ]
+    },
+    {
+      "name": "reservation_slot",
+      "label": "예약 시간대",
+      "rows": [
+        [
+          "seat_id",
+          "BIGINT",
+          "N",
+          "-",
+          "PK(복합)",
+          "seat.seat_id",
+          "-"
+        ],
+        [
+          "slot_start",
+          "DATETIME",
+          "N",
+          "-",
+          "PK(복합)",
+          "-",
+          "-"
+        ],
+        [
+          "reservation_id",
+          "BIGINT",
+          "N",
+          "-",
+          "-",
+          "reservation.reservation_id",
+          "-"
+        ]
+      ],
+      "pk": [
+        "seat_id",
+        "slot_start"
+      ],
+      "fks": [
+        {
+          "name": "fk_slot_seat",
+          "col": "seat_id",
+          "target": "seat.seat_id",
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_slot_resv",
+          "col": "reservation_id",
+          "target": "reservation.reservation_id",
+          "onDelete": "CASCADE",
+          "onUpdate": "RESTRICT"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_slot_resv",
+          "unique": false,
+          "cols": "reservation_id"
+        }
+      ],
+      "checks": []
+    },
+    {
+      "name": "payment",
+      "label": "결제",
+      "rows": [
+        [
+          "payment_id",
+          "BIGINT",
+          "N",
+          "-",
+          "PK",
+          "-",
+          "AUTO_INCREMENT"
+        ],
+        [
+          "reservation_id",
+          "BIGINT",
+          "N",
+          "-",
+          "-",
+          "reservation.reservation_id",
+          "uq_payment_resv (reservation_id)"
+        ],
+        [
+          "amount",
+          "INT",
+          "N",
+          "-",
+          "-",
+          "-",
+          "ck_payment_amount; ck_payment_refund"
+        ],
+        [
+          "method",
+          "ENUM('CARD','TRANSFER','KAKAO','POINT')",
+          "N",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "status",
+          "ENUM('PAID','REFUNDED','FAILED')",
+          "N",
+          "'PAID'",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "refund_amount",
+          "INT",
+          "Y",
+          "-",
+          "-",
+          "-",
+          "ck_payment_refund"
+        ],
+        [
+          "paid_at",
+          "DATETIME",
+          "N",
+          "CURRENT_TIMESTAMP",
+          "-",
+          "-",
+          "-"
+        ]
+      ],
+      "pk": [
+        "payment_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_payment_resv",
+          "col": "reservation_id",
+          "target": "reservation.reservation_id",
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "uq_payment_resv",
+          "unique": true,
+          "cols": "reservation_id"
+        }
+      ],
+      "checks": [
+        {
+          "name": "ck_payment_amount",
+          "expression": "amount >= 0"
+        },
+        {
+          "name": "ck_payment_refund",
+          "expression": "refund_amount IS NULL OR (refund_amount >= 0 AND refund_amount <= amount)"
+        }
+      ]
+    },
+    {
+      "name": "point_history",
+      "label": "포인트 내역",
+      "rows": [
+        [
+          "point_id",
+          "BIGINT",
+          "N",
+          "-",
+          "PK",
+          "-",
+          "AUTO_INCREMENT"
+        ],
+        [
+          "member_id",
+          "BIGINT",
+          "N",
+          "-",
+          "-",
+          "member.member_id",
+          "-"
+        ],
+        [
+          "reservation_id",
+          "BIGINT",
+          "Y",
+          "-",
+          "-",
+          "reservation.reservation_id",
+          "-"
+        ],
+        [
+          "delta",
+          "INT",
+          "N",
+          "-",
+          "-",
+          "-",
+          "ck_point_delta"
+        ],
+        [
+          "reason",
+          "VARCHAR(100)",
+          "N",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "created_at",
+          "DATETIME",
+          "N",
+          "CURRENT_TIMESTAMP",
+          "-",
+          "-",
+          "-"
+        ]
+      ],
+      "pk": [
+        "point_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_point_member",
+          "col": "member_id",
+          "target": "member.member_id",
+          "onDelete": "CASCADE",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_point_resv",
+          "col": "reservation_id",
+          "target": "reservation.reservation_id",
+          "onDelete": "SET NULL",
+          "onUpdate": "RESTRICT"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_point_member",
+          "unique": false,
+          "cols": "member_id, created_at"
+        }
+      ],
+      "checks": [
+        {
+          "name": "ck_point_delta",
+          "expression": "delta <> 0"
+        }
+      ]
+    },
+    {
+      "name": "review",
+      "label": "후기",
+      "rows": [
+        [
+          "review_id",
+          "BIGINT",
+          "N",
+          "-",
+          "PK",
+          "-",
+          "AUTO_INCREMENT"
+        ],
+        [
+          "member_id",
+          "BIGINT",
+          "N",
+          "-",
+          "-",
+          "member.member_id",
+          "-"
+        ],
+        [
+          "cafe_id",
+          "BIGINT",
+          "N",
+          "-",
+          "-",
+          "cafe.cafe_id",
+          "-"
+        ],
+        [
+          "reservation_id",
+          "BIGINT",
+          "Y",
+          "-",
+          "-",
+          "reservation.reservation_id",
+          "uq_review_resv (reservation_id)"
+        ],
+        [
+          "rating",
+          "TINYINT",
+          "N",
+          "-",
+          "-",
+          "-",
+          "ck_review_rating"
+        ],
+        [
+          "content",
+          "TEXT",
+          "Y",
+          "-",
+          "-",
+          "-",
+          "-"
+        ],
+        [
+          "created_at",
+          "DATETIME",
+          "N",
+          "CURRENT_TIMESTAMP",
+          "-",
+          "-",
+          "-"
+        ]
+      ],
+      "pk": [
+        "review_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_review_member",
+          "col": "member_id",
+          "target": "member.member_id",
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_review_cafe",
+          "col": "cafe_id",
+          "target": "cafe.cafe_id",
+          "onDelete": "CASCADE",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_review_resv",
+          "col": "reservation_id",
+          "target": "reservation.reservation_id",
+          "onDelete": "SET NULL",
+          "onUpdate": "RESTRICT"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "uq_review_resv",
+          "unique": true,
+          "cols": "reservation_id"
+        },
+        {
+          "name": "idx_review_cafe",
+          "unique": false,
+          "cols": "cafe_id, created_at"
+        }
+      ],
+      "checks": [
+        {
+          "name": "ck_review_rating",
+          "expression": "rating BETWEEN 1 AND 5"
+        }
+      ]
+    }
+  ]
+}
